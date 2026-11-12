@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplicación de Bingo Profesional</title>
+    <!-- Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Canvas Confetti for winning celebrations -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+        body { font-family: 'Poppins', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between">
+
+    <!-- Header -->
+    <header class="bg-slate-800 border-b border-slate-700 shadow-lg py-4 px-6 flex flex-wrap justify-between items-center gap-4">
+        <div class="flex items-center space-x-3">
+            <div class="bg-indigo-600 p-2 rounded-xl text-white font-bold text-xl shadow-md">🎰</div>
+            <div>
+                <h1 class="text-xl font-bold tracking-wide">Bingo Profesional</h1>
+                <p class="text-xs text-slate-400">Sistema de Sorteo y Tarjetas Interactivas</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-3">
+            <button onclick="switchView('caller')" id="nav-caller" class="px-4 py-2 text-sm font-medium rounded-lg transition bg-indigo-600 text-white shadow">Panel del Cantor</button>
+            <button onclick="switchView('player')" id="nav-player" class="px-4 py-2 text-sm font-medium rounded-lg transition bg-slate-700 text-slate-300 hover:bg-slate-600">Tarjeta de Jugador</button>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-grow container mx-auto p-4 md:p-6 max-w-6xl">
+
+        <!-- ==================== CALLER VIEW ==================== -->
+        <div id="view-caller" class="space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <!-- Left: Current Ball Display & Controls -->
+                <div class="lg:col-span-1 bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl flex flex-col items-center justify-between">
+                    <div class="w-full text-center">
+                        <h2 class="text-slate-400 text-sm uppercase tracking-wider font-semibold mb-2">Bola Actual</h2>
+                        <div id="current-ball-display" class="w-36 h-36 mx-auto rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-2xl border-4 border-slate-700 mb-4 transition-all transform scale-100">
+                            <span id="current-ball-text" class="text-4xl md:text-5xl font-extrabold text-white">--</span>
+                        </div>
+                        <p id="current-ball-label" class="text-lg font-medium text-indigo-300">¡Listo para comenzar!</p>
+                    </div>
+
+                    <div class="w-full space-y-3 mt-6">
+                        <button onclick="drawBall()" id="draw-btn" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl shadow-lg transition flex items-center justify-center space-x-2 text-lg">
+                            <span>Sacar Siguiente Bola</span>
+                        </button>
+                        <div class="flex space-x-2">
+                            <button onclick="toggleAutoPlay()" id="autoplay-btn" class="flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium rounded-lg transition">Auto (5s)</button>
+                            <button onclick="resetGame()" class="flex-1 py-2 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-sm font-medium rounded-lg transition">Reiniciar</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Full Board Matrix -->
+                <div class="lg:col-span-2 bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-lg font-bold text-slate-200">Tablero General (1 - 75)</h2>
+                            <span id="balls-drawn-count" class="text-xs bg-slate-700 px-3 py-1 rounded-full text-slate-300 font-medium">Bolas sorteadas: 0 / 75</span>
+                        </div>
+                        
+                        <!-- B-I-N-G-O Grid Container -->
+                        <div class="grid grid-cols-5 gap-2 text-center mb-4">
+                            <div class="bg-indigo-600 text-white font-bold py-2 rounded-lg">B</div>
+                            <div class="bg-rose-600 text-white font-bold py-2 rounded-lg">I</div>
+                            <div class="bg-amber-600 text-white font-bold py-2 rounded-lg">N</div>
+                            <div class="bg-emerald-600 text-white font-bold py-2 rounded-lg">G</div>
+                            <div class="bg-purple-600 text-white font-bold py-2 rounded-lg">O</div>
+                        </div>
+
+                        <!-- Number Grid (1-75 mapped by columns) -->
+                        <div id="master-board" class="grid grid-cols-5 gap-2">
+                            <!-- Populated via Javascript -->
+                        </div>
+                    </div>
+
+                    <!-- History / Last Drawn List -->
+                    <div class="mt-6 pt-4 border-t border-slate-700">
+                        <p class="text-xs text-slate-400 mb-2 font-medium">Últimas bolas sorteadas:</p>
+                        <div id="history-list" class="flex flex-wrap gap-2 overflow-x-auto max-h-16 py-1">
+                            <span class="text-xs text-slate-500 italic">Ninguna bola sortea aún.</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ==================== PLAYER VIEW ==================== -->
+        <div id="view-player" class="hidden space-y-6">
+            <div class="max-w-md mx-auto bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
+                
+                <!-- Card Header -->
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-100">Cartón de Bingo</h2>
+                        <p class="text-xs text-slate-400" id="player-card-id">ID de Tarjeta: #8492</p>
+                    </div>
+                    <button onclick="generateNewCard()" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-xs font-medium rounded-lg text-slate-200 transition">Nuevo Cartón</button>
+                </div>
+
+                <!-- BINGO Header Banner -->
+                <div class="grid grid-cols-5 gap-2 text-center mb-3">
+                    <div class="bg-indigo-600 text-white font-extrabold py-2 rounded-lg text-sm">B</div>
+                    <div class="bg-rose-600 text-white font-extrabold py-2 rounded-lg text-sm">I</div>
+                    <div class="bg-amber-600 text-white font-extrabold py-2 rounded-lg text-sm">N</div>
+                    <div class="bg-emerald-600 text-white font-extrabold py-2 rounded-lg text-sm">G</div>
+                    <div class="bg-purple-600 text-white font-extrabold py-2 rounded-lg text-sm">O</div>
+                </div>
+
+                <!-- Player Card Grid -->
+                <div id="player-board" class="grid grid-cols-5 gap-2 aspect-square">
+                    <!-- Populated via Javascript -->
+                </div>
+
+                <!-- Actions & Win Status -->
+                <div class="mt-6 text-center space-y-3">
+                    <button onclick="checkBingo()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition">
+                        ¡Verificar BINGO!
+                    </button>
+                    <p id="bingo-status-msg" class="text-sm font-medium text-slate-400"></p>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-800 border-t border-slate-700 py-4 text-center text-xs text-slate-400">
+        Aplicación de Bingo Profesional &bull; Diseñada para entretenimiento fluido y dinámico
+    </footer>
+
+    <!-- Script Application Logic -->
+    <script>
+        // State Management
+        let drawnBalls = [];
+        let autoPlayInterval = null;
+        let playerCardNumbers = [];
+        let playerCardMarks = Array(25).fill(false);
+
+        // Letters ranges configuration for American Bingo (1-75)
+        // B: 1-15, I: 16-30, N: 31-45, G: 46-60, O: 61-75
+        function getBallLetter(num) {
+            if (num <= 15) return 'B';
+            if (num <= 30) return 'I';
+            if (num <= 45) return 'N';
+            if (num <= 60) return 'G';
+            return 'O';
+        }
+
+        // Initialize UI components
+        window.addEventListener('DOMContentLoaded', () => {
+            renderMasterBoard();
+            generateNewCard();
+        });
+
+        function switchView(viewName) {
+            const callerEl = document.getElementById('view-caller');
+            const playerEl = document.getElementById('view-player');
+            const navCaller = document.getElementById('nav-caller');
+            const navPlayer = document.getElementById('nav-player');
+
+            if (viewName === 'caller') {
+                callerEl.classList.remove('hidden');
+                playerEl.classList.add('hidden');
+                navCaller.className = "px-4 py-2 text-sm font-medium rounded-lg transition bg-indigo-600 text-white shadow";
+                navPlayer.className = "px-4 py-2 text-sm font-medium rounded-lg transition bg-slate-700 text-slate-300 hover:bg-slate-600";
+            } else {
+                playerEl.classList.remove('hidden');
+                callerEl.classList.add('hidden');
+                navPlayer.className = "px-4 py-2 text-sm font-medium rounded-lg transition bg-indigo-600 text-white shadow";
+                navCaller.className = "px-4 py-2 text-sm font-medium rounded-lg transition bg-slate-700 text-slate-300 hover:bg-slate-600";
+            }
+        }
+
+        // Master Board Rendering (organised by columns B, I, N, G, O)
+        function renderMasterBoard() {
+            const boardContainer = document.getElementById('master-board');
+            boardContainer.innerHTML = '';
+
+            // We create 5 columns or rows structured logically. Standard board layout shows numbers 1-75 ordered by column or row. 
+            // Let's create an array of 75 numbers arranged column-wise: B(1-15), I(16-30), N(31-45), G(46-60), O(61-75)
+            // Or row-wise. Standard caller boards usually list 1 to 75 sequentially in a 5x15 grid or 15x5 grid. Let's do 15 rows of 5 columns.
+            for (let row = 0; row < 15; row++) {
+                for (let col = 0; col < 5; col++) {
+                    const num = col * 15 + row + 1;
+                    const cell = document.createElement('div');
+                    cell.id = `master-ball-${num}`;
+                    cell.className = "bg-slate-700/50 rounded-lg h-9 flex items-center justify-center font-bold text-sm text-slate-400 transition-all";
+                    cell.innerText = num;
+                    boardContainer.appendChild(cell);
+                }
+            }
+        }
+
+        // Draw a random unique ball
+        function drawBall() {
+            if (drawnBalls.length >= 75) {
+                alert("¡Se han sortearon todas las 75 bolas!");
+                stopAutoPlay();
+                return;
+            }
+
+            let available = [];
+            for (let i = 1; i <= 75; i++) {
+                if (!drawnBalls.includes(i)) available.push(i);
+            }
+
+            const randomIndex = Math.floor(Math.random() * available.length);
+            const selectedBall = available[randomIndex];
+            drawnBalls.push(selectedBall);
+
+            updateCallerUI(selectedBall);
+            updatePlayerCardAutoMarks(selectedBall);
+        }
+
+        function updateCallerUI(latestBall) {
+            const letter = getBallLetter(latestBall);
+            
+            // Update current ball display
+            document.getElementById('current-ball-text').innerText = `${letter}-${latestBall}`;
+            document.getElementById('current-ball-label').innerText = `Letra ${letter}, Número ${latestBall}`;
+            
+            // Update master board state
+            const cell = document.getElementById(`master-ball-${latestBall}`);
+            if (cell) {
+                cell.className = "bg-indigo-600 text-white rounded-lg h-9 flex items-center justify-center font-extrabold text-sm shadow-md transform scale-105 transition-all";
+            }
+
+            // Update counter
+            document.getElementById('balls-drawn-count').innerText = `Bolas sorteadas: ${drawnBalls.length} / 75`;
+
+            // Update history list
+            const historyContainer = document.getElementById('history-list');
+            if (drawnBalls.length === 1) historyContainer.innerHTML = '';
+            
+            const badge = document.createElement('span');
+            badge.className = "bg-slate-700 text-indigo-300 px-2.5 py-1 rounded-md text-xs font-semibold border border-slate-600";
+            badge.innerText = `${letter}-${latestBall}`;
+            historyContainer.prepend(badge);
+        }
+
+        function toggleAutoPlay() {
+            const btn = document.getElementById('autoplay-btn');
+            if (autoPlayInterval) {
+                stopAutoPlay();
+                btn.innerText = "Auto (5s)";
+                btn.className = "flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium rounded-lg transition";
+            } else {
+                if (drawnBalls.length >= 75) return;
+                autoPlayInterval = setInterval(() => {
+                    if (drawnBalls.length >= 75) {
+                        stopAutoPlay();
+                        return;
+                    }
+                    drawBall();
+                }, 5000);
+                btn.innerText = "Detener Auto";
+                btn.className = "flex-1 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition shadow";
+            }
+        }
+
+        function stopAutoPlay() {
+            if (autoPlayInterval) {
+                clearInterval(autoPlayInterval);
+                autoPlayInterval = null;
+                const btn = document.getElementById('autoplay-btn');
+                if (btn) {
+                    btn.innerText = "Auto (5s)";
+                    btn.className = "flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium rounded-lg transition";
+                }
+            }
+        }
+
+        function resetGame() {
+            stopAutoPlay();
+            drawnBalls = [];
+            renderMasterBoard();
+            document.getElementById('current-ball-text').innerText = "--";
+            document.getElementById('current-ball-label').innerText = "¡Listo para comenzar!";
+            document.getElementById('balls-drawn-count').innerText = "Bolas sorteadas: 0 / 75";
+            document.getElementById('history-list').innerHTML = '<span class="text-xs text-slate-500 italic">Ninguna bola sortea aún.</span>';
+            generateNewCard();
+            document.getElementById('bingo-status-msg').innerText = "";
+        }
+
+        // Player Card Generator Logic (Standard 5x5 American Bingo Card)
+        // B: 1-15, I: 16-30, N: 31-45 (center FREE), G: 46-60, O: 61-75
+        function generateNewCard() {
+            playerCardNumbers = [];
+            playerCardMarks = Array(25).fill(false);
+            playerCardMarks[12] = true; // Center is FREE
+
+            const colRanges = [
+                {min: 1, max: 15},
+                {min: 16, max: 30},
+                {min: 31, max: 45},
+                {min: 46, max: 60},
+                {min: 61, max: 75}
+            ];
+
+            let columnsData = [];
+            for (let c = 0; c < 5; c++) {
+                let nums = [];
+                let range = colRanges[c];
+                while(nums.length < 5) {
+                    let rand = Math.floor(Math.random() * (range.max - range.min + 1)) + range.min;
+                    if (!nums.includes(rand)) nums.push(rand);
+                }
+                nums.sort((a,b) => a - b);
+                columnsData.push(nums);
+            }
+
+            // Transpose columns into 25 flat array ordered row by row
+            for (let r = 0; r < 5; r++) {
+                for (let c = 0; c < 5; c++) {
+                    if (r === 2 && c === 2) {
+                        playerCardNumbers.push('FREE');
+                    } else {
+                        playerCardNumbers.push(columnsData[c][r]);
+                    }
+                }
+            }
+
+            document.getElementById('player-card-id').innerText = `ID de Tarjeta: #${Math.floor(1000 + Math.random() * 9000)}`;
+            document.getElementById('bingo-status-msg').innerText = "";
+            renderPlayerBoard();
+        }
+
+        function renderPlayerBoard() {
+            const boardContainer = document.getElementById('player-board');
+            boardContainer.innerHTML = '';
+
+            for (let i = 0; i < 25; i++) {
+                const cell = document.createElement('button');
+                const val = playerCardNumbers[i];
+                const isMarked = playerCardMarks[i];
+                
+                if (val === 'FREE') {
+                    cell.className = "bg-amber-600/30 border border-amber-500/50 text-amber-300 font-bold rounded-xl flex items-center justify-center text-xs md:text-sm cursor-default select-none shadow-inner";
+                    cell.innerText = "FREE";
+                } else {
+                    if (isMarked) {
+                        cell.className = "bg-indigo-600 text-white font-bold rounded-xl flex items-center justify-center text-sm md:text-base shadow-md transition transform scale-95 ring-2 ring-indigo-400";
+                    } else {
+                        cell.className = "bg-slate-700/60 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl flex items-center justify-center text-sm md:text-base transition shadow";
+                    }
+                    cell.innerText = val;
+                    cell.onclick = () => togglePlayerCell(i);
+                }
+                boardContainer.appendChild(cell);
+            }
+        }
+
+        function togglePlayerCell(index) {
+            const val = playerCardNumbers[index];
+            // Allow marking only if the ball has been drawn or if it's free, or let players click freely (helpful for custom play). 
+            // Professional check: Let's allow manual toggle but check if number was drawn for validation.
+            playerCardMarks[index] = !playerCardMarks[index];
+            renderPlayerBoard();
+        }
+
+        function updatePlayerCardAutoMarks(ballNum) {
+            const idx = playerCardNumbers.indexOf(ballNum);
+            if (idx !== -1) {
+                playerCardMarks[idx] = true;
+                renderPlayerBoard();
+            }
+        }
+
+        function checkBingo() {
+            // Validate winning combinations (Rows, Columns, Diagonals)
+            let hasWon = false;
+
+            // Check Rows
+            for (let r = 0; r < 5; r++) {
+                if (playerCardMarks[r*5] && playerCardMarks[r*5+1] && playerCardMarks[r*5+2] && playerCardMarks[r*5+3] && playerCardMarks[r*5+4]) {
+                    hasWon = true;
+                }
+            }
+
+            // Check Columns
+            for (let c = 0; c < 5; c++) {
+                if (playerCardMarks[c] && playerCardMarks[c+5] && playerCardMarks[c+10] && playerCardMarks[c+15] && playerCardMarks[c+20]) {
+                    hasWon = true;
+                }
+            }
+
+            // Check Diagonals
+            if (playerCardMarks[0] && playerCardMarks[6] && playerCardMarks[12] && playerCardMarks[18] && playerCardMarks[24]) hasWon = true;
+            if (playerCardMarks[4] && playerCardMarks[8] && playerCardMarks[12] && playerCardMarks[16] && playerCardMarks[20]) hasWon = true;
+
+            const msgEl = document.getElementById('bingo-status-msg');
+            if (hasWon) {
+                msgEl.className = "text-sm font-bold text-emerald-400 animate-pulse";
+                msgEl.innerText = "¡FELICIDADES! ¡Has hecho BINGO!";
+                confetti({
+                    particleCount: 100,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+            } else {
+                msgEl.className = "text-sm font-medium text-rose-400";
+                msgEl.innerText = "Aún no hay BINGO válido. ¡Sigue revisando!";
+            }
+        }
+    </script>
+</body>
+</html>

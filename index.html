@@ -1,0 +1,1762 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplicación de Bingo Profesional - Conectada a Firebase</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                }
+            }
+        }
+    </script>
+    <style>
+        * { box-sizing: border-box; }
+        body { max-width: 100vw; overflow-x: hidden; }
+
+        #win-modal > div { max-width: 650px !important; width: 90% !important; }
+        .cartones-ganadores-grid {
+            display: flex; flex-wrap: wrap; gap: 15px;
+            justify-content: center; max-height: 350px; overflow-y: auto; margin: 15px 0;
+        }
+        .mini-carton-ganador {
+            background: #1e293b; color: #fff; padding: 10px; border-radius: 8px; width: 180px;
+            border: 1px solid rgba(255,215,0,0.4);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        .mini-carton-ganador h4 { font-size: 11px; margin-bottom: 2px; color: #ffD700; font-weight: bold; }
+        .mini-carton-ganador .ganador-jugador { font-size: 10px; color: #38bdf8; margin-bottom: 6px; font-weight: bold; }
+        .mini-carton-ganador .ganador-modalidad { font-size: 9px; background: rgba(239, 68, 68, 0.2); color: #fca5a5; padding: 2px 4px; border-radius: 4px; margin-bottom: 6px; display: inline-block; border: 1px solid rgba(239, 68, 68, 0.4); }
+        .mini-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; }
+        .mini-celda {
+            background: #334155; font-size: 9px; height: 22px;
+            display: flex; align-items: center; justify-content: center; border-radius: 3px; font-weight: bold; color: #cbd5e1;
+        }
+        .mini-celda.ganadora { background: #ef4444 !important; color: white !important; transform: scale(1.05); }
+        .mini-celda.libre { background: #10b981 !important; color: white !important; font-size: 7px; }
+
+        /* Estilos de fichas marcadas dinámicas */
+        .bingo-cell-marked-emerald { background: linear-gradient(135deg, #059669 0%, #047857 100%) !important; color: white !important; border-color: #34d399 !important; transform: scale(0.95); box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
+        .bingo-cell-marked-purple { background: linear-gradient(135deg, #9333ea 0%, #7e22ce 100%) !important; color: white !important; border-color: #c084fc !important; transform: scale(0.95); box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
+        .bingo-cell-marked-blue { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important; color: white !important; border-color: #60a5fa !important; transform: scale(0.95); box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
+        .bingo-cell-marked-rose { background: linear-gradient(135deg, #db2777 0%, #be185d 100%) !important; color: white !important; border-color: #f472b6 !important; transform: scale(0.95); box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
+        .bingo-cell-marked-indigo { background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%) !important; color: white !important; border-color: #818cf8 !important; transform: scale(0.95); box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
+        .bingo-cell-marked-orange { background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%) !important; color: white !important; border-color: #fb923c !important; transform: scale(0.95); box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
+        
+        .bingo-cell-marked-vino {
+            background: linear-gradient(135deg, #722F37 0%, #4A151B 100%) !important;
+            color: white !important;
+            border-color: #D27D7D !important;
+            transform: scale(0.95);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+        }
+        .bingo-cell-marked-celeste { background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%) !important; color: white !important; border-color: #7dd3fc !important; transform: scale(0.95); box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
+        .bingo-cell-marked-red { background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important; color: white !important; border-color: #f87171 !important; transform: scale(0.95); box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
+        .master-cell-marked { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important; color: white !important; border-color: #4338ca !important; box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3); }
+        .double-frame { border: 3px solid #6366f1; box-shadow: 0 0 0 2px #334155, 0 8px 20px -4px rgba(0, 0, 0, 0.4); }
+        
+        @keyframes titilarFaltanteMaestro {
+          0% { background-color: #f59e0b; border-color: #fef08a; transform: scale(1); box-shadow: 0 0 8px #f59e0b; color: #0f172a; }
+          50% { background-color: #b45309; border-color: #fde68a; transform: scale(1.08); box-shadow: 0 0 16px #fbbf24; color: #ffffff; }
+          100% { background-color: #f59e0b; border-color: #fef08a; transform: scale(1); box-shadow: 0 0 8px #f59e0b; color: #0f172a; }
+        }
+        .master-cell-missing { animation: titilarFaltanteMaestro 0.8s infinite ease-in-out !important; font-weight: 900 !important; z-index: 10; }
+
+        .cards-horizontal-container {
+            display: grid !important;
+            grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+            gap: 0.75rem !important;
+            max-height: 50vh !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            width: 100% !important;
+        }
+        @media (min-width: 640px) {
+            .cards-horizontal-container { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        }
+        .cards-horizontal-container > div { width: 100% !important; min-width: 0 !important; }
+
+        /* Estilos para el Modo Lado a Lado en Móviles */
+        body.side-by-side-mobile #main-container-layout {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 8px !important;
+            padding: 4px !important;
+        }
+        body.side-by-side-mobile #main-container-layout > section {
+            grid-column: span 1 !important;
+        }
+        body.side-by-side-mobile .cards-horizontal-container {
+            grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+            max-height: 40vh !important;
+        }
+        body.side-by-side-mobile h1 span:nth-child(2) {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 h-full flex flex-col font-sans overflow-x-hidden text-xs">
+
+    <!-- Header compacto -->
+    <header class="bg-slate-800 border-b border-slate-700 px-3 py-2 flex flex-wrap justify-between items-center shadow-md gap-2">
+        <div class="flex items-center space-x-2">
+            <div class="bg-gradient-to-tr from-indigo-600 to-violet-500 p-1.5 rounded-lg shadow-md text-white">
+                <i class="fa-solid fa-ticket text-sm"></i>
+            </div>
+            <div>
+                <h1 class="text-xs sm:text-sm font-bold tracking-tight text-white flex items-center gap-1.5">
+                  <span>BINGO DE YOIS</span>
+                  <span class="text-[9px] bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 px-1.5 py-0.2 rounded-full font-medium">Cloud</span>
+                </h1>
+                <p class="text-[10px] text-slate-400 hidden sm:block">Sistema profesional de 75 bolas</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <label class="text-[11px] text-slate-300 font-semibold flex items-center gap-1">
+                <i class="fa-solid fa-palette text-indigo-400"></i> Tema:
+            </label>
+            <select id="bg-theme-selector" onchange="changeBackgroundTheme(this.value)" class="bg-slate-900 text-slate-200 text-[11px] px-2 py-1 rounded-lg border border-slate-700 outline-none cursor-pointer">
+                <option value="dark">Oscuro Profundo</option>
+                <option value="vino">Vino Tinto Navideño</option>
+                <option value="emerald">Verde Esmeralda</option>
+                <option value="purple">Morado Místico</option>
+            </select>
+        </div>
+
+        <div class="flex items-center gap-1.5">
+            <button onclick="toggleSideBySideMode()" id="btn-side-side" class="bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition flex items-center gap-1 shadow-sm" title="Alternar Modo Lado a Lado">
+                <i class="fa-solid fa-columns"></i> <span class="hidden sm:inline">Lado a Lado</span>
+            </button>
+            <button onclick="openCardSelectorModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition flex items-center gap-1 shadow-sm">
+                <i class="fa-solid fa-sliders"></i> Cartones
+            </button>
+            <button onclick="downloadApp()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 p-1.5 rounded-lg text-[11px] font-semibold transition border border-slate-600" title="Descargar App">
+                <i class="fa-solid fa-download text-indigo-400"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Layout -->
+    <main class="flex-1 max-w-[1600px] w-full mx-auto p-2 sm:p-4 flex flex-col lg:grid lg:grid-cols-12 gap-3 items-start" id="main-container-layout">
+        
+        <!-- Left Column (Tablero Maestro) -->
+        <section class="w-full lg:col-span-5 flex flex-col gap-3" id="master-board-section">
+            <div class="bg-slate-800 rounded-xl p-2 sm:p-3 shadow-xl flex flex-col double-frame flex-1">
+                <div class="flex justify-between items-center mb-1.5">
+                    <h3 class="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                        <i class="fa-solid fa-table-cells text-indigo-400"></i> Tablero Maestro
+                    </h3>
+                    <div class="flex items-center gap-1.5">
+                        <span id="drawn-count-badge" class="text-[9px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-1.5 py-0.5 rounded-full font-semibold">0 cantados</span>
+                        <button onclick="resetGame()" class="bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 px-1.5 py-0.5 rounded text-[9px] font-semibold transition flex items-center gap-1">
+                            <i class="fa-solid fa-rotate-right"></i> Reiniciar
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mb-2 bg-slate-900 border border-indigo-500/30 rounded-lg p-1.5 flex items-center gap-1.5 overflow-x-auto shadow-inner">
+                    <span class="text-[9px] font-bold text-indigo-400 uppercase tracking-wider whitespace-nowrap"><i class="fa-solid fa-clock-rotate-left"></i> Últimas:</span>
+                    <div id="recent-balls-history" class="flex items-center gap-1">
+                        <span class="text-[10px] text-slate-500 italic">Ninguna bola aún</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-5 gap-1 flex-1" id="master-board-columns"></div>
+            </div>
+
+            <!-- Cartones a Pique -->
+            <div class="bg-slate-800 border border-amber-500/40 rounded-xl p-2.5 shadow-xl flex flex-col gap-1.5">
+                <div class="flex items-center justify-between pb-1 border-b border-slate-700">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Cartones a Pique (¡A 1 ficha!)
+                    </span>
+                    <span id="near-win-count-badge" class="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded-full font-semibold">0 a pique</span>
+                </div>
+                <div id="near-win-cards-container" class="flex flex-col gap-1 max-h-36 overflow-y-auto">
+                    <div class="text-[10px] text-slate-400 text-center py-2 italic">Ningún cartón a pique por ahora...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Column (Modalidades y Cartones Activos) -->
+        <section class="w-full lg:col-span-7 flex flex-col gap-3" id="right-panel-section">
+            
+            <!-- MODALIDADES CON MINIATURAS -->
+            <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-lg overflow-hidden p-2 flex flex-col gap-1.5">
+                <div class="bg-slate-900 border border-indigo-500/30 rounded-lg p-1.5 flex items-center justify-between shadow-inner">
+                    <div class="flex items-center gap-2 overflow-x-auto py-0.5" id="active-modalities-preview-bar"></div>
+                    <button onclick="toggleModalitiesDropdown()" class="text-[10px] bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/40 px-2.5 py-1 rounded font-semibold whitespace-nowrap ml-1 flex items-center gap-1">
+                        <i class="fa-solid fa-sliders text-[10px]"></i> Config
+                    </button>
+                </div>
+
+                <details id="modalities-details-box" class="group border border-slate-700/80 rounded-lg overflow-hidden bg-slate-900/50">
+                    <summary class="p-2 bg-slate-800 hover:bg-slate-700/50 cursor-pointer flex items-center justify-between transition select-none list-none text-[11px]">
+                        <span class="font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
+                            <i class="fa-solid fa-list-check text-indigo-400"></i> Seleccionar y Crear Modalidades Activas
+                        </span>
+                        <button onclick="event.stopPropagation(); openNewModalityModal();" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded text-[10px] font-semibold flex items-center gap-1">
+                            <i class="fa-solid fa-plus"></i> Nueva Modalidad
+                        </button>
+                    </summary>
+                    <div class="p-2.5 border-t border-slate-700/60 bg-slate-900/90 flex flex-col gap-2">
+                        <div id="modalities-checkbox-container" class="bg-slate-950 border border-slate-800 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1.5"></div>
+                    </div>
+                </details>
+            </div>
+
+            <!-- CARTONES ACTIVOS -->
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-2.5 shadow-xl flex flex-col gap-2">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Tus Cartones Activos</span>
+                        <span id="active-cards-subtitle" class="text-[10px] text-indigo-400 font-medium">0 cartones</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <button onclick="clearAllMarks()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1 rounded text-[10px]">Limpiar Marcas</button>
+                        <button onclick="removeAllActiveCards()" class="bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 px-2 py-1 rounded text-[10px] font-semibold transition">Eliminar Todos</button>
+                    </div>
+                </div>
+                <div class="bg-slate-800/60 border border-slate-700/80 rounded-xl p-2 shadow-inner min-h-0 flex flex-col">
+                    <div class="cards-horizontal-container" id="active-cards-container"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- BOTÓN FLOTANTE MODO PROYECTOR -->
+    <button onclick="openProjectorMode()" class="fixed bottom-5 right-5 z-40 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold px-4 py-3 rounded-full shadow-2xl flex items-center gap-2 border border-indigo-400/40 transition-all transform hover:scale-105" title="Abrir Proyector">
+        <i class="fa-solid fa-person-chalkboard text-base"></i>
+        <span class="text-xs tracking-wide">Modo Proyector</span>
+    </button>
+
+    <!-- MODAL DE GANADOR -->
+    <div id="win-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-[60] hidden flex items-center justify-center p-3">
+        <div class="bg-slate-900 border-2 border-amber-400 rounded-2xl p-5 sm:p-6 shadow-2xl flex flex-col text-center">
+            <div class="inline-flex mx-auto bg-amber-500/20 p-3 rounded-full text-amber-400 mb-2 border border-amber-500/40 animate-bounce">
+                <i class="fa-solid fa-trophy text-2xl"></i>
+            </div>
+            <h2 class="text-lg sm:text-xl font-black text-amber-400 uppercase tracking-wide">¡BINGO GANADOR!</h2>
+            <p id="win-modal-subtitle" class="text-xs text-slate-300 mt-1">¡Se ha completado una o más modalidades!</p>
+            <div class="cartones-ganadores-grid" id="winning-cards-preview-container"></div>
+            <div class="mt-4 flex justify-center">
+                <button onclick="closeWinModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-xl text-xs font-semibold shadow-lg">Continuar Jugando</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL MODO PROYECTOR INTERACTIVO MEJORADO -->
+    <div id="projector-modal" class="fixed inset-0 bg-slate-950/95 backdrop-blur-md z-50 hidden flex flex-col p-2 sm:p-4 overflow-y-auto">
+        <div class="flex justify-between items-center mb-2 pb-2 border-b border-slate-800 shrink-0">
+            <div class="flex items-center gap-2">
+                <div class="bg-indigo-600/20 p-2 rounded-lg text-indigo-400 border border-indigo-500/30">
+                    <i class="fa-solid fa-person-chalkboard text-base"></i>
+                </div>
+                <div>
+                    <h2 class="text-sm sm:text-base font-black text-white uppercase tracking-wider">Modo Proyector Interactivo</h2>
+                    <p class="text-[10px] text-slate-400">Haz clic en los números para cantarlos directamente</p>
+                </div>
+                <span id="projector-count-badge" class="bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-bold px-2.5 py-0.5 rounded-full ml-2">0 cantados</span>
+            </div>
+            <button onclick="closeProjectorMode()" class="bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-compress"></i> Salir
+            </button>
+        </div>
+
+        <!-- BARRA SUPERIOR DE PROYECTOR: Últimas bolas, modalidades activas y a pique -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2 shrink-0">
+            <!-- Últimas bolas cantadas -->
+            <div class="bg-slate-900 border border-indigo-500/30 rounded-lg p-2 flex items-center gap-1.5 shadow-inner overflow-x-auto">
+                <span class="text-[10px] font-bold text-indigo-400 uppercase whitespace-nowrap"><i class="fa-solid fa-clock-rotate-left"></i> Últimas:</span>
+                <div id="projector-recent-balls" class="flex items-center gap-1">
+                    <span class="text-[10px] text-slate-500 italic">Ninguna</span>
+                </div>
+            </div>
+            <!-- Modalidades Activas en Miniatura -->
+            <div class="bg-slate-900 border border-indigo-500/30 rounded-lg p-2 flex items-center gap-2 shadow-inner overflow-x-auto" id="projector-modalities-bar"></div>
+            <!-- Cartones a Pique -->
+            <div class="bg-slate-900 border border-amber-500/40 rounded-lg p-2 flex items-center justify-between shadow-inner">
+                <span class="text-[10px] font-bold text-amber-400 uppercase flex items-center gap-1"><i class="fa-solid fa-triangle-exclamation"></i> A Pique:</span>
+                <div id="projector-near-win-container" class="flex items-center gap-1 overflow-x-auto max-w-[200px]">
+                    <span class="text-[10px] text-slate-500 italic">Ninguno</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tablero Maestro Gigante en Proyector -->
+        <div class="max-w-5xl w-full mx-auto flex-1 flex flex-col justify-center">
+            <div id="projector-board-grid" class="grid grid-cols-5 gap-1.5 bg-slate-900/80 p-3 rounded-2xl border border-slate-800 shadow-2xl"></div>
+        </div>
+    </div>
+
+    <!-- MODAL NUEVA MODALIDAD -->
+    <div id="new-modality-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+        <div class="bg-slate-800 border border-emerald-500/40 rounded-2xl p-4 sm:p-6 max-w-md w-full shadow-2xl flex flex-col">
+            <div class="flex justify-between items-center mb-3 pb-2 border-b border-slate-700">
+                <h3 class="text-sm font-bold text-white"><i class="fa-solid fa-plus-circle text-emerald-400"></i> Crear Nueva Modalidad</h3>
+                <button onclick="closeNewModalityModal()" class="text-slate-400 hover:text-white p-1.5"><i class="fa-solid fa-xmark text-base"></i></button>
+            </div>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-[11px] text-slate-300 font-semibold block mb-1">Nombre de la Modalidad:</label>
+                    <input type="text" id="new-mod-name" placeholder="Ej: La Letra X, Cruz, Marco..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="text-[11px] text-slate-300 font-semibold block mb-1">Descripción breve:</label>
+                    <input type="text" id="new-mod-desc" placeholder="Ej: Forma una X en el cartón" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="text-[11px] text-slate-300 font-semibold block mb-1">Dibuja el Patrón (haz clic en las casillas requeridas):</label>
+                    <div id="builder-grid" class="grid grid-cols-5 gap-1.5 bg-slate-950 p-3 rounded-xl border border-slate-700 max-w-[220px] mx-auto"></div>
+                </div>
+            </div>
+            <div class="mt-5 flex justify-end gap-2">
+                <button onclick="closeNewModalityModal()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-2 rounded-xl text-xs">Cancelar</button>
+                <button onclick="saveNewModality()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2 rounded-xl text-xs">Guardar Modalidad</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Selector de Cartones -->
+    <div id="card-selector-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+        <div class="bg-slate-800 border border-indigo-500/40 rounded-2xl p-4 sm:p-6 max-w-3xl w-full shadow-2xl flex flex-col max-h-[90vh]">
+            <div class="flex justify-between items-center mb-3 pb-2 border-b border-slate-700">
+                <h3 class="text-sm font-bold text-white"><i class="fa-solid fa-palette text-indigo-400"></i> Selector de Cartones y Asignación</h3>
+                <button onclick="closeCardSelectorModal()" class="text-slate-400 hover:text-white p-1.5"><i class="fa-solid fa-xmark text-base"></i></button>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div class="flex gap-1.5">
+                    <button onclick="selectAllCards(true)" class="bg-indigo-600/20 text-indigo-300 px-2.5 py-1 rounded text-[10px]">Todos</button>
+                    <button onclick="selectAllCards(false)" class="bg-slate-700 text-slate-300 px-2.5 py-1 rounded text-[10px]">Ninguno</button>
+                </div>
+                <input type="text" id="card-search-input" oninput="filterCardSelector()" placeholder="Buscar por número..." class="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-[11px] text-slate-200">
+            </div>
+
+            <div class="flex-1 overflow-y-auto space-y-3 pr-1" id="selector-cards-list"></div>
+
+            <div class="mt-4 pt-3 border-t border-slate-700 flex justify-end">
+                <button onclick="applyCardSelection()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 px-4 rounded-xl text-xs">Guardar Selección y Jugar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script de Lógica General y Firebase Unificado -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDiP9qIpq-4csLKL6-7ZAa1kIpUCgpbYbE",
+            authDomain: "bingo-de-yois.firebaseapp.com",
+            databaseURL: "https://bingo-de-yois-default-rtdb.firebaseio.com",
+            projectId: "bingo-de-yois",
+            storageBucket: "bingo-de-yois.firebasestorage.app",
+            messagingSenderId: "460854612050",
+            appId: "1:460854612050:web:92739a749f9048008a4f8b"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const auth = getAuth(app);
+
+        window.allAvailableCards = [];
+        window.selectedCardsIds = [];
+        window.cardMarks = {}; 
+        window.playerNames = {}; 
+        window.masterMarkedNumbers = new Set();
+        window.alreadyDeclaredWins = new Set();
+        window.drawnHistoryArray = [];
+
+        window.gameModes = {
+            blackout: { name: "Cartón Lleno", desc: "Todas las casillas.", isCellInPattern: (r, c) => true, active: true },
+            diagonal: { name: "Diagonal", desc: "Cualquier diagonal.", isCellInPattern: (r, c) => (r === c) || (r + c === 4), active: false },
+            horizontal: { name: "Horizontal", desc: "Fila completa.", isCellInPattern: (r, c) => false, active: false },
+            vertical: { name: "Vertical", desc: "Columna completa.", isCellInPattern: (r, c) => false, active: false },
+            corners: { name: "4 Esquinas", desc: "Las esquinas.", isCellInPattern: (r, c) => (r === 0 && c === 0) || (r === 0 && c === 4) || (r === 4 && c === 0) || (r === 4 && c === 4), active: false }
+        };
+
+        window.guardarEstadoEnLocalStorage = function() {
+            localStorage.setItem('bingo_selectedCardsIds', JSON.stringify(window.selectedCardsIds));
+            localStorage.setItem('bingo_cardMarks', JSON.stringify(window.cardMarks));
+            localStorage.setItem('bingo_playerNames', JSON.stringify(window.playerNames));
+            localStorage.setItem('bingo_masterMarkedNumbers', JSON.stringify(Array.from(window.masterMarkedNumbers)));
+            localStorage.setItem('bingo_alreadyDeclaredWins', JSON.stringify(Array.from(window.alreadyDeclaredWins)));
+            localStorage.setItem('bingo_drawnHistoryArray', JSON.stringify(window.drawnHistoryArray));
+        }
+
+        window.cargarEstadoDesdeLocalStorage = function() {
+            try {
+                const s = localStorage.getItem('bingo_selectedCardsIds');
+                const m = localStorage.getItem('bingo_cardMarks');
+                const p = localStorage.getItem('bingo_playerNames');
+                const masterArr = localStorage.getItem('bingo_masterMarkedNumbers');
+                const winsArr = localStorage.getItem('bingo_alreadyDeclaredWins');
+                const histArr = localStorage.getItem('bingo_drawnHistoryArray');
+
+                if (s) window.selectedCardsIds = JSON.parse(s);
+                if (m) window.cardMarks = JSON.parse(m);
+                if (p) window.playerNames = JSON.parse(p);
+                if (masterArr) window.masterMarkedNumbers = new Set(JSON.parse(masterArr));
+                if (winsArr) window.alreadyDeclaredWins = new Set(JSON.parse(winsArr));
+                if (histArr) window.drawnHistoryArray = JSON.parse(histArr);
+                return true;
+            } catch(e) { return false; }
+        }
+
+        try {
+            const savedModes = localStorage.getItem('bingo_custom_gameModes');
+            if (savedModes) {
+                let parsed = JSON.parse(savedModes);
+                for (let k in parsed) {
+                    let p = parsed[k];
+                    let cellsSelectedMap = p.cellsMap || {};
+                    window.gameModes[k] = {
+                        name: p.name,
+                        desc: p.desc,
+                        active: p.active !== undefined ? p.active : true,
+                        isCellInPattern: (r, c) => !!cellsSelectedMap[`${r}-${c}`]
+                    };
+                }
+            }
+            const savedPlayerNames = localStorage.getItem('bingo_playerNames');
+            if (savedPlayerNames) {
+                window.playerNames = JSON.parse(savedPlayerNames);
+            }
+        } catch(e){}
+
+        window.saveGameModesToStorage = function() {
+            let serializable = {};
+            for (let k in window.gameModes) {
+                let m = window.gameModes[k];
+                let cellsMap = {};
+                for (let r=0; r<5; r++) {
+                    for (let c=0; c<5; c++) {
+                        if (m.isCellInPattern(r, c)) cellsMap[`${r}-${c}`] = true;
+                    }
+                }
+                serializable[k] = { name: m.name, desc: m.desc, active: m.active, cellsMap };
+            }
+            localStorage.setItem('bingo_custom_gameModes', JSON.stringify(serializable));
+        }
+
+        async function cargarCartonesDesdeFirebase() {
+            try {
+                await signInAnonymously(auth);
+                const dbRef = ref(db);
+                const snapshot = await get(dbRef);
+                
+                if (snapshot.exists()) {
+                    const datos = snapshot.val();
+                    let cartonesCargados = [];
+                    let idGlobalContador = 1;
+
+                    Object.keys(datos).forEach(nombreColorKey => {
+                        let nodoColor = datos[nombreColorKey];
+                        if (!nodoColor || typeof nodoColor !== 'object') return;
+
+                        let nombreBonito = nombreColorKey.charAt(0).toUpperCase() + nombreColorKey.slice(1);
+                        let temaCss = 'indigo';
+                        let lowerColor = nombreColorKey.toLowerCase();
+
+                        if (lowerColor.includes('tinto') || lowerColor.includes('vino') || lowerColor.includes('wine')) {
+                            temaCss = 'vino';
+                        } else if (lowerColor.includes('verde')) {
+                            temaCss = 'emerald';
+                        } else if (lowerColor.includes('morado') || lowerColor.includes('violeta') || lowerColor.includes('purple')) {
+                            temaCss = 'purple';
+                        } else if (lowerColor.includes('celeste') || lowerColor.includes('sky') || lowerColor.includes('cyan')) {
+                            temaCss = 'celeste';
+                        } else if (lowerColor.includes('azul') || lowerColor.includes('blue')) {
+                            temaCss = 'blue';
+                        } else if (lowerColor.includes('ros') || lowerColor.includes('pink')) {
+                            temaCss = 'rose';
+                        } else if (lowerColor.includes('roj') || lowerColor.includes('red')) {
+                            temaCss = 'red';
+                        } else if (lowerColor.includes('naranj') || lowerColor.includes('orange')) {
+                            temaCss = 'orange';
+                        } else {
+                            temaCss = 'indigo'; 
+                        }
+
+                        const extraerDeNodo = (nodoActual, subNombreLote) => {
+                            if (!nodoActual || typeof nodoActual !== 'object') return;
+
+                            let keys = Object.keys(nodoActual);
+                            let esContenedorDeCartones = keys.some(k => !isNaN(k) && typeof nodoActual[k] === 'object' && nodoActual[k] !== null);
+
+                            if (esContenedorDeCartones) {
+                                keys.forEach(keyCarton => {
+                                    if (isNaN(keyCarton)) return;
+                                    let cartonContainer = nodoActual[keyCarton];
+                                    if (!cartonContainer || typeof cartonContainer !== 'object') return;
+
+                                    let idCartonFinal = cartonContainer.id || cartonContainer.carton_id || keyCarton;
+                                    let numeroLimpio = parseInt(String(idCartonFinal).replace(/\D/g, '')) || parseInt(keyCarton) || 0;
+
+                                    let debeInvertir = false;
+                                    if (lowerColor.includes('verde')) {
+                                        debeInvertir = true;
+                                    } else if (lowerColor.includes('azul') && numeroLimpio >= 61 && numeroLimpio <= 120) {
+                                        debeInvertir = true;
+                                    }
+
+                                    let matrizFinal = Array(5).fill(0).map(() => Array(5).fill(0));
+                                    let datosCargados = false;
+                                    let letrasBingo = ['B', 'I', 'N', 'G', 'O'];
+                                    let tieneLetrasBingo = letrasBingo.some(l => cartonContainer[l] !== undefined);
+
+                                    if (tieneLetrasBingo || cartonContainer.columns) {
+                                        let cols = cartonContainer.columns || cartonContainer;
+                                        letrasBingo.forEach((letra, cIndex) => {
+                                            let colData = cols[letra];
+                                            if (colData && typeof colData === 'object') {
+                                                for (let rIndex = 0; rIndex < 5; rIndex++) {
+                                                    let val = colData[rIndex] !== undefined ? colData[rIndex] : colData[String(rIndex)];
+                                                    if (val !== undefined) {
+                                                        matrizFinal[rIndex][cIndex] = (val === "FREE") ? "FREE" : (parseInt(val) || 0);
+                                                    }
+                                                }
+                                                datosCargados = true;
+                                            }
+                                        });
+                                    }
+
+                                    if (!datosCargados) {
+                                        let fuenteMatriz = cartonContainer.matrix || cartonContainer;
+                                        for (let r = 0; r < 5; r++) {
+                                            let filaObj = fuenteMatriz[r] || fuenteMatriz[String(r)];
+                                            if (filaObj && typeof filaObj === 'object') {
+                                                for (let c = 0; c < 5; c++) {
+                                                    let val = filaObj[c] !== undefined ? filaObj[c] : filaObj[String(c)];
+                                                    if (val !== undefined) {
+                                                        if (debeInvertir) {
+                                                            matrizFinal[c][r] = (val === "FREE") ? "FREE" : (parseInt(val) || 0);
+                                                        } else {
+                                                            matrizFinal[r][c] = (val === "FREE") ? "FREE" : (parseInt(val) || 0);
+                                                        }
+                                                        datosCargados = true;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if (!datosCargados && Array.isArray(cartonContainer.numbers)) {
+                                        let idx = 0;
+                                        for (let r = 0; r < 5; r++) {
+                                            for (let c = 0; c < 5; c++) {
+                                                let val = cartonContainer.numbers[idx++];
+                                                matrizFinal[r][c] = (val === "FREE") ? "FREE" : (parseInt(val) || 0);
+                                            }
+                                        }
+                                    }
+
+                                    matrizFinal[2][2] = "FREE";
+
+                                    let idUnicoGlobal = idGlobalContador++;
+                                    let savedPlayerName = window.playerNames[idUnicoGlobal] || cartonContainer.playerName || "";
+
+                                    cartonesCargados.push({
+                                        id: idUnicoGlobal,
+                                        title: `Cartón #${idCartonFinal}`,
+                                        numberId: numeroLimpio,
+                                        batch: subNombreLote,
+                                        color: temaCss,
+                                        numbers: matrizFinal,
+                                        playerName: savedPlayerName
+                                    });
+                                });
+                            } else {
+                                keys.forEach(subKey => {
+                                    extraerDeNodo(nodoActual[subKey], `${subNombreLote} - ${subKey}`);
+                                });
+                            }
+                        };
+
+                        extraerDeNodo(nodoColor, nombreBonito);
+                    });
+
+                    if (cartonesCargados.length > 0) {
+                        window.allAvailableCards = cartonesCargados;
+                        let sesionRecuperada = window.cargarEstadoDesdeLocalStorage();
+                        if (!sesionRecuperada || window.selectedCardsIds.length === 0) {
+                            window.selectedCardsIds = [];
+                        }
+                        
+                        window.renderMasterBoard();
+                        window.buildCardSelectorModalList();
+                        window.initModalitiesList();
+                        window.initActiveCards();
+                        window.updateDrawnCountBadge();
+                        window.renderPlayerCards();
+                    }
+                }
+            } catch (error) {
+                console.error("Error al cargar cartones desde la raíz:", error);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('bingo_bg_theme') || 'dark';
+            document.getElementById('bg-theme-selector').value = savedTheme;
+            window.changeBackgroundTheme(savedTheme);
+            
+            if (localStorage.getItem('bingo_side_by_side') === 'true') {
+                document.body.classList.add('side-by-side-mobile');
+            }
+
+            window.cargarEstadoDesdeLocalStorage();
+            window.renderMasterBoard();
+            window.initModalitiesList();
+            cargarCartonesDesdeFirebase();
+        });
+    </script>
+
+    <!-- Script de Interfaz y UI Global -->
+    <script>
+        let builderPatternState = {};
+
+        window.toggleSideBySideMode = function() {
+            document.body.classList.toggle('side-by-side-mobile');
+            const isActive = document.body.classList.contains('side-by-side-mobile');
+            localStorage.setItem('bingo_side_by_side', isActive);
+        };
+
+        window.openNewModalityModal = function() {
+            document.getElementById('new-mod-name').value = '';
+            document.getElementById('new-mod-desc').value = '';
+            builderPatternState = {};
+            
+            const builderGrid = document.getElementById('builder-grid');
+            builderGrid.innerHTML = '';
+            for (let r=0; r<5; r++) {
+                for (let c=0; c<5; c++) {
+                    let cell = document.createElement('button');
+                    cell.type = 'button';
+                    cell.className = 'w-9 h-9 bg-slate-900 border border-slate-700 rounded transition font-bold text-[10px] text-slate-400';
+                    cell.id = `builder-${r}-${c}`;
+                    cell.textContent = `${r},${c}`;
+                    cell.onclick = () => {
+                        let key = `${r}-${c}`;
+                        if (builderPatternState[key]) {
+                            delete builderPatternState[key];
+                            cell.className = 'w-9 h-9 bg-slate-900 border border-slate-700 rounded transition font-bold text-[10px] text-slate-400';
+                        } else {
+                            builderPatternState[key] = true;
+                            cell.className = 'w-9 h-9 bg-emerald-600 border border-emerald-400 rounded transition font-bold text-[10px] text-white';
+                        }
+                    };
+                    builderGrid.appendChild(cell);
+                }
+            }
+            document.getElementById('new-modality-modal').classList.remove('hidden');
+        }
+
+        window.closeNewModalityModal = function() {
+            document.getElementById('new-modality-modal').classList.add('hidden');
+        }
+
+        window.saveNewModality = function() {
+            let name = document.getElementById('new-mod-name').value.trim();
+            let desc = document.getElementById('new-mod-desc').value.trim();
+            if (!name) {
+                alert("Por favor ingresa un nombre para la modalidad.");
+                return;
+            }
+            let key = 'custom_' + Date.now();
+            let patternMap = {...builderPatternState};
+
+            window.gameModes[key] = {
+                name: name,
+                desc: desc || 'Modalidad personalizada',
+                active: true,
+                isCellInPattern: (r, c) => !!patternMap[`${r}-${c}`]
+            };
+
+            window.saveGameModesToStorage();
+            window.closeNewModalityModal();
+            window.initModalitiesList();
+            window.renderMasterBoard();
+            window.renderPlayerCards();
+            window.checkAllCardsForWins();
+        }
+
+        window.deleteCustomModality = function(key) {
+            if (confirm("¿Estás seguro de eliminar esta modalidad?")) {
+                delete window.gameModes[key];
+                window.saveGameModesToStorage();
+                window.initModalitiesList();
+                window.renderMasterBoard();
+                window.renderPlayerCards();
+                window.checkAllCardsForWins();
+            }
+        }
+
+        window.getCardColorConfig = function(colorStr) {
+            let color = (colorStr || '').toString().toLowerCase().trim();
+
+            if (color.includes('tinto') || color.includes('vino') || color.includes('wine')) {
+                return {
+                    name: 'vino',
+                    markedClass: 'bingo-cell-marked-vino',
+                    borderModal: 'border-[#722F37]/40 bg-[#4A151B]/20',
+                    textModal: 'text-[#D27D7D]',
+                    badgeModal: 'bg-[#722F37]/30 text-[#D27D7D]',
+                    btnChecked: 'bg-[#722F37] text-white border-[#D27D7D]',
+                    btnUnchecked: 'bg-[#4A151B]/40 text-[#D27D7D] border-[#722F37]/40',
+                    activeStyle: 'border: 2px solid #722F37;',
+                    activeTextClass: 'text-[#D27D7D]',
+                    activeLetterClass: 'text-[#D27D7D]',
+                    headerBorder: 'border-[#722F37]/40'
+                };
+            }
+            if (color.includes('celeste') || color.includes('sky') || color.includes('cyan')) {
+                return {
+                    name: 'celeste',
+                    markedClass: 'bingo-cell-marked-celeste',
+                    borderModal: 'border-sky-400/40 bg-sky-950/30',
+                    textModal: 'text-sky-300',
+                    badgeModal: 'bg-sky-500/20 text-sky-300',
+                    btnChecked: 'bg-sky-500 text-white border-sky-300',
+                    btnUnchecked: 'bg-sky-950/40 text-sky-200 border-sky-500/30',
+                    activeStyle: 'border: 2px solid #38bdf8;',
+                    activeTextClass: 'text-sky-300',
+                    activeLetterClass: 'text-sky-400',
+                    headerBorder: 'border-sky-500/30'
+                };
+            }
+            if (color.includes('ros') || color.includes('pink')) {
+                return {
+                    name: 'rose',
+                    markedClass: 'bingo-cell-marked-rose',
+                    borderModal: 'border-pink-500/40 bg-pink-950/25',
+                    textModal: 'text-pink-300',
+                    badgeModal: 'bg-pink-500/20 text-pink-300',
+                    btnChecked: 'bg-pink-600 text-white border-pink-400',
+                    btnUnchecked: 'bg-pink-950/40 text-pink-200 border-pink-500/30',
+                    activeStyle: 'border: 2px solid #ec4899;',
+                    activeTextClass: 'text-pink-300',
+                    activeLetterClass: 'text-pink-400',
+                    headerBorder: 'border-pink-500/30'
+                };
+            }
+            if (color.includes('azul') || color.includes('blue')) {
+                return {
+                    name: 'blue',
+                    markedClass: 'bingo-cell-marked-blue',
+                    borderModal: 'border-blue-500/40 bg-blue-950/25',
+                    textModal: 'text-blue-300',
+                    badgeModal: 'bg-blue-500/20 text-blue-300',
+                    btnChecked: 'bg-blue-600 text-white border-blue-400',
+                    btnUnchecked: 'bg-blue-950/40 text-blue-200 border-blue-500/30',
+                    activeStyle: 'border: 2px solid #3b82f6;',
+                    activeTextClass: 'text-blue-300',
+                    activeLetterClass: 'text-blue-400',
+                    headerBorder: 'border-blue-500/30'
+                };
+            }
+            if (color.includes('roj') || color.includes('red')) {
+                return {
+                    name: 'red',
+                    markedClass: 'bingo-cell-marked-red',
+                    borderModal: 'border-red-500/40 bg-red-950/25',
+                    textModal: 'text-red-300',
+                    badgeModal: 'bg-red-500/20 text-red-300',
+                    btnChecked: 'bg-red-600 text-white border-red-400',
+                    btnUnchecked: 'bg-red-950/40 text-red-200 border-red-500/30',
+                    activeStyle: 'border: 2px solid #ef4444;',
+                    activeTextClass: 'text-red-300',
+                    activeLetterClass: 'text-red-400',
+                    headerBorder: 'border-red-500/30'
+                };
+            }
+            if (color.includes('morado') || color.includes('purple') || color.includes('violeta')) {
+                return {
+                    name: 'purple',
+                    markedClass: 'bingo-cell-marked-purple',
+                    borderModal: 'border-purple-500/40 bg-purple-950/25',
+                    textModal: 'text-purple-300',
+                    badgeModal: 'bg-purple-500/20 text-purple-300',
+                    btnChecked: 'bg-purple-600 text-white border-purple-400',
+                    btnUnchecked: 'bg-purple-950/40 text-purple-200 border-purple-500/30',
+                    activeStyle: 'border: 2px solid #a855f7;',
+                    activeTextClass: 'text-purple-300',
+                    activeLetterClass: 'text-purple-400',
+                    headerBorder: 'border-purple-500/30'
+                };
+            }
+            return {
+                name: 'emerald',
+                markedClass: 'bingo-cell-marked-emerald',
+                borderModal: 'border-emerald-500/30 bg-emerald-950/20',
+                textModal: 'text-emerald-300',
+                badgeModal: 'bg-emerald-500/20 text-emerald-300',
+                btnChecked: 'bg-emerald-600 text-white border-emerald-400',
+                btnUnchecked: 'bg-emerald-950/40 text-emerald-200 border-emerald-500/30',
+                activeStyle: 'border: 2px solid #10b981;',
+                activeTextClass: 'text-emerald-300',
+                activeLetterClass: 'text-emerald-400',
+                headerBorder: 'border-emerald-500/30'
+            };
+        }
+
+        window.generateMiniDiagramHTML = function(patternChecker) {
+            let html = `<div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; width: 32px; height: 32px;" class="bg-slate-950 p-0.5 rounded border border-slate-700 shrink-0">`;
+            for (let r = 0; r < 5; r++) {
+                for (let c = 0; c < 5; c++) {
+                    let active = patternChecker(r, c);
+                    let cellStyle = active ? `bg-indigo-500 border border-white` : 'bg-slate-800 border border-slate-700/60';
+                    html += `<div class="${cellStyle} rounded-[1px]"></div>`;
+                }
+            }
+            html += `</div>`;
+            return html;
+        }
+
+        window.toggleModalitiesDropdown = function() {
+            const detailsBox = document.getElementById('modalities-details-box');
+            detailsBox.open = !detailsBox.open;
+        }
+
+        window.initModalitiesList = function() {
+            const container = document.getElementById('modalities-checkbox-container');
+            const previewBar = document.getElementById('active-modalities-preview-bar');
+            if (!container || !previewBar) return;
+            
+            container.innerHTML = '';
+            previewBar.innerHTML = '';
+
+            for (let key in window.gameModes) {
+                let mode = window.gameModes[key];
+                let label = document.createElement('div');
+                label.className = "flex items-center justify-between p-2 rounded-xl bg-slate-900 border border-slate-800 cursor-pointer text-[11px] transition gap-2";
+                
+                let deleteBtnHTML = key.startsWith('custom_') ? `
+                    <button type="button" onclick="event.stopPropagation(); deleteCustomModality('${key}')" class="text-rose-400 hover:text-rose-300 p-1" title="Eliminar modalidad">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>` : '';
+
+                label.innerHTML = `
+                    <div class="flex items-center gap-2.5 flex-1 overflow-hidden">
+                        <input type="checkbox" value="${key}" ${mode.active ? 'checked' : ''} onchange="toggleModalityActive('${key}', this.checked)" class="w-3.5 h-3.5 rounded text-indigo-600 bg-slate-950 border-slate-700 shrink-0">
+                        ${window.generateMiniDiagramHTML(mode.isCellInPattern)}
+                        <div class="truncate">
+                            <span class="font-bold text-slate-100 block text-xs truncate">${mode.name}</span>
+                            <span class="text-[9px] text-slate-400 block truncate">${mode.desc}</span>
+                        </div>
+                    </div>
+                    ${deleteBtnHTML}
+                `;
+                container.appendChild(label);
+
+                if (mode.active) {
+                    let previewItem = document.createElement('div');
+                    previewItem.className = "flex items-center gap-1 bg-slate-950 border border-indigo-500/30 px-1.5 py-0.5 rounded text-[10px] text-indigo-300 shrink-0";
+                    previewItem.innerHTML = `${window.generateMiniDiagramHTML(mode.isCellInPattern)} <span class="font-semibold">${mode.name}</span>`;
+                    previewBar.appendChild(previewItem);
+                }
+            }
+        }
+
+        window.toggleModalityActive = function(key, status) {
+            if (window.gameModes[key]) window.gameModes[key].active = status;
+            window.saveGameModesToStorage();
+            window.initModalitiesList();
+            window.renderMasterBoard();
+            window.renderPlayerCards();
+            window.checkAllCardsForWins();
+        }
+
+        window.changeBackgroundTheme = function(theme) {
+            const body = document.body;
+            body.className = body.className.replace(/bg-\[#2B0D12\]|bg-emerald-950|bg-purple-950|bg-slate-950/g, '');
+            if (theme === 'vino') body.classList.add('bg-[#2B0D12]');
+            else if (theme === 'emerald') body.classList.add('bg-emerald-950');
+            else if (theme === 'purple') body.classList.add('bg-purple-950');
+            else body.classList.add('bg-slate-950');
+            localStorage.setItem('bingo_bg_theme', theme);
+        }
+
+        window.buildCardSelectorModalList = function(filterText = "") {
+            const container = document.getElementById('selector-cards-list');
+            if (!container) return;
+
+            const openGroupsState = {};
+            container.querySelectorAll('details').forEach(det => {
+                const gKeyAttr = det.getAttribute('data-gkey');
+                if (gKeyAttr) openGroupsState[gKeyAttr] = det.open;
+            });
+
+            container.innerHTML = '';
+
+            const groups = {};
+            window.allAvailableCards.forEach(card => {
+                if (filterText && !card.title.toLowerCase().includes(filterText.toLowerCase()) && !String(card.numberId).includes(filterText)) return;
+                let gKey = `${card.color}_${card.batch}`;
+                if (!groups[gKey]) groups[gKey] = { color: card.color, batchName: card.batch, cards: [] };
+                groups[gKey].cards.push(card);
+            });
+
+            for (let gKey in groups) {
+                let group = groups[gKey];
+                let cfg = window.getCardColorConfig(group.color);
+
+                let details = document.createElement('details');
+                details.className = `border rounded-xl overflow-hidden ${cfg.borderModal} transition mb-3 shadow-sm`;
+                details.setAttribute('data-gkey', gKey);
+                details.open = filterText ? true : (openGroupsState[gKey] !== undefined ? openGroupsState[gKey] : false);
+                
+                let summaryDiv = document.createElement('summary');
+                summaryDiv.className = `p-3 bg-slate-900/95 cursor-pointer flex justify-between items-center font-bold text-xs ${cfg.textModal} select-none`;
+                summaryDiv.innerHTML = `
+                    <span class="text-sm font-black"><i class="fa-solid fa-layer-group"></i> ${group.batchName} (${group.cards.length} cartones)</span>
+                    <span class="text-[9px] px-2 py-0.5 rounded border ${cfg.badgeModal}">Desplegar / Ocultar</span>
+                `;
+                details.appendChild(summaryDiv);
+
+                let controlsDiv = document.createElement('div');
+                controlsDiv.className = 'bg-slate-950/95 p-2.5 border-t border-slate-700/80 flex flex-col gap-2';
+                controlsDiv.onclick = (e) => e.stopPropagation();
+                
+                controlsDiv.innerHTML = `
+                    <div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800">
+                        <span class="text-[11px] text-slate-300 font-semibold"><i class="fa-solid fa-bolt text-indigo-400"></i> Selección rápida:</span>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" class="btn-select-all-safe bg-indigo-600/35 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 px-2.5 py-1 rounded text-[10px] font-semibold transition">Marcar todos</button>
+                            <button type="button" class="btn-deselect-all-safe bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/40 px-2.5 py-1 rounded text-[10px] font-semibold transition">Quitar todos</button>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <div class="flex-1 min-w-[200px] flex items-center gap-1.5">
+                            <input type="text" id="multi-range-${gKey}" placeholder="Ej: 1,4,15 o 40-69" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-[11px] text-slate-200 outline-none focus:border-indigo-500">
+                            <button type="button" onclick="applyMultiSelectForGroup('${gKey}', true)" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded text-[10px] font-semibold whitespace-nowrap">Marcar</button>
+                            <button type="button" onclick="applyMultiSelectForGroup('${gKey}', false)" class="bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 px-2.5 py-1 rounded text-[10px] font-semibold whitespace-nowrap">Quitar</button>
+                        </div>
+                        <div class="flex-1 min-w-[200px] flex items-center gap-1.5">
+                            <input type="text" id="batch-name-${gKey}" placeholder="Nombre para este grupo" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-[11px] text-white outline-none focus:border-indigo-500">
+                            <button type="button" onclick="applyNameToGroup('${gKey}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded text-[10px] font-semibold whitespace-nowrap"><i class="fa-solid fa-user-tag"></i> Asignar</button>
+                        </div>
+                    </div>
+                `;
+
+                controlsDiv.querySelector('.btn-select-all-safe').onclick = () => window.selectAllForGroup(gKey, true);
+                controlsDiv.querySelector('.btn-deselect-all-safe').onclick = () => window.selectAllForGroup(gKey, false);
+
+                details.appendChild(controlsDiv);
+
+                let contentDiv = document.createElement('div');
+                contentDiv.className = "p-2.5 border-t border-slate-700/60 bg-slate-950/70 grid grid-cols-3 sm:grid-cols-6 gap-2 max-h-48 overflow-y-auto";
+                
+                group.cards.forEach(card => {
+                    let isChecked = window.selectedCardsIds.includes(card.id);
+                    let cardDiv = document.createElement('div');
+                    cardDiv.className = `flex flex-col items-center justify-center p-2 rounded-lg border cursor-pointer transition-all ${isChecked ? cfg.btnChecked : cfg.btnUnchecked}`;
+                    cardDiv.innerHTML = `<span class="text-[8px] uppercase">Cartón</span><span class="text-xs font-black">#${card.numberId}</span>`;
+
+                    cardDiv.onclick = () => {
+                        let idx = window.selectedCardsIds.indexOf(card.id);
+                        if (idx === -1) window.selectedCardsIds.push(card.id);
+                        else window.selectedCardsIds.splice(idx, 1);
+                        window.buildCardSelectorModalList(filterText);
+                        window.guardarEstadoEnLocalStorage();
+                        window.initActiveCards();
+                    };
+                    contentDiv.appendChild(cardDiv);
+                });
+                details.appendChild(contentDiv);
+                container.appendChild(details);
+            }
+        }
+
+        window.selectAllForGroup = function(gKey, selectStatus) {
+            window.allAvailableCards.forEach(card => {
+                let cardGKey = `${card.color}_${card.batch}`;
+                if (cardGKey === gKey) {
+                    let idx = window.selectedCardsIds.indexOf(card.id);
+                    if (selectStatus && idx === -1) {
+                        window.selectedCardsIds.push(card.id);
+                    } else if (!selectStatus && idx !== -1) {
+                        window.selectedCardsIds.splice(idx, 1);
+                        delete window.cardMarks[card.id];
+                        delete window.playerNames[card.id];
+                    }
+                }
+            });
+
+            window.buildCardSelectorModalList(document.getElementById('card-search-input').value);
+            window.guardarEstadoEnLocalStorage();
+            window.initActiveCards();
+        }
+
+        window.applyMultiSelectForGroup = function(gKey, selectStatus) {
+            const inputEl = document.getElementById(`multi-range-${gKey}`);
+            const nameEl = document.getElementById(`batch-name-${gKey}`);
+            const inputVal = inputEl.value.trim();
+            const nameVal = nameEl ? nameEl.value.trim() : "";
+
+            if (!inputVal) {
+                alert("Por favor ingresa números o rangos (ej: 1,4,15 o 40-69).");
+                return;
+            }
+
+            let targetNumbers = new Set();
+            inputVal.split(',').forEach(part => {
+                part = part.trim();
+                if (part.includes('-')) {
+                    let rangeParts = part.split('-');
+                    let start = parseInt(rangeParts[0]);
+                    let end = parseInt(rangeParts[1]);
+                    if (!isNaN(start) && !isNaN(end)) {
+                        let min = Math.min(start, end);
+                        let max = Math.max(start, end);
+                        for (let i = min; i <= max; i++) targetNumbers.add(i);
+                    }
+                } else {
+                    let num = parseInt(part);
+                    if (!isNaN(num)) targetNumbers.add(num);
+                }
+            });
+
+            window.allAvailableCards.forEach(card => {
+                let cardGKey = `${card.color}_${card.batch}`;
+                if (cardGKey === gKey && targetNumbers.has(card.numberId)) {
+                    let idx = window.selectedCardsIds.indexOf(card.id);
+                    if (selectStatus) {
+                        if (idx === -1) window.selectedCardsIds.push(card.id);
+                        if (nameVal) window.playerNames[card.id] = nameVal;
+                    } else if (!selectStatus && idx !== -1) {
+                        window.selectedCardsIds.splice(idx, 1);
+                        delete window.cardMarks[card.id];
+                        delete window.playerNames[card.id];
+                    }
+                }
+            });
+
+            if (selectStatus) {
+                inputEl.value = '';
+                if (nameEl && nameVal) nameEl.value = '';
+            }
+
+            window.buildCardSelectorModalList(document.getElementById('card-search-input').value);
+            window.guardarEstadoEnLocalStorage();
+            window.initActiveCards();
+        }
+
+        window.applyNameToGroup = function(gKey) {
+            const nameEl = document.getElementById(`batch-name-${gKey}`);
+            const nameVal = nameEl.value.trim();
+            if (!nameVal) {
+                alert("Por favor escribe un nombre para asignar.");
+                return;
+            }
+
+            let countAssigned = 0;
+            window.allAvailableCards.forEach(card => {
+                let cardGKey = `${card.color}_${card.batch}`;
+                let hasNameAlready = window.playerNames[card.id] && window.playerNames[card.id].trim() !== "";
+                if (cardGKey === gKey && window.selectedCardsIds.includes(card.id) && !hasNameAlready) {
+                    window.playerNames[card.id] = nameVal;
+                    countAssigned++;
+                }
+            });
+
+            window.guardarEstadoEnLocalStorage();
+            window.initActiveCards();
+            
+            if (countAssigned > 0) {
+                nameEl.value = '';
+                alert(`¡Nombre asignado correctamente a ${countAssigned} cartón(es)!`);
+            } else {
+                alert(`Aviso: No hay cartones seleccionados sin nombre en este grupo.`);
+            }
+        }
+
+        window.filterCardSelector = function() {
+            window.buildCardSelectorModalList(document.getElementById('card-search-input').value);
+        }
+
+        window.openCardSelectorModal = function() {
+            window.cargarEstadoDesdeLocalStorage();
+            window.buildCardSelectorModalList();
+            document.getElementById('card-selector-modal').classList.remove('hidden');
+        }
+
+        window.closeCardSelectorModal = function() {
+            document.getElementById('card-selector-modal').classList.add('hidden');
+        }
+
+        window.selectAllCards = function(select) {
+            window.selectedCardsIds = select ? window.allAvailableCards.map(c => c.id) : [];
+            window.buildCardSelectorModalList();
+            window.guardarEstadoEnLocalStorage();
+            window.initActiveCards();
+        }
+
+        window.applyCardSelection = function() {
+            window.closeCardSelectorModal();
+            window.initActiveCards();
+        }
+
+        window.removeActiveCard = function(id) {
+            let index = window.selectedCardsIds.indexOf(id);
+            if (index !== -1) {
+                window.selectedCardsIds.splice(index, 1);
+                delete window.cardMarks[id];
+                delete window.playerNames[id];
+                window.guardarEstadoEnLocalStorage();
+                window.initActiveCards();
+            }
+        }
+
+        window.removeAllActiveCards = function() {
+            window.selectedCardsIds = [];
+            window.cardMarks = {};
+            window.playerNames = {};
+            window.guardarEstadoEnLocalStorage();
+            window.initActiveCards();
+        }
+
+        window.updatePlayerName = function(cardId, nameVal) {
+            window.playerNames[cardId] = nameVal;
+            window.guardarEstadoEnLocalStorage();
+        }
+
+        window.initActiveCards = function() {
+            const container = document.getElementById('active-cards-container');
+            const subtitle = document.getElementById('active-cards-subtitle');
+            if (!container) return;
+            container.innerHTML = '';
+            
+            if (subtitle) subtitle.textContent = `${window.selectedCardsIds.length} cartones en mesa`;
+
+            window.selectedCardsIds.forEach(id => {
+                let card = window.allAvailableCards.find(c => c.id === id);
+                if (!card) return;
+                if (!window.cardMarks[card.id]) window.cardMarks[card.id] = { "2-2": true };
+                let cfg = window.getCardColorConfig(card.color);
+                let currentPlayerName = window.playerNames[card.id] || card.playerName || "";
+
+                const cardWrapper = document.createElement('div');
+                cardWrapper.className = `bg-slate-900 rounded-xl p-2 shadow-md flex flex-col transition-all relative`;
+                cardWrapper.setAttribute('style', cfg.activeStyle);
+               
+                let headerHTML = `
+                    <div class="flex justify-between items-center mb-1.5 pb-1 border-b ${cfg.headerBorder} gap-1">
+                        <span class="font-bold text-[11px] ${cfg.activeTextClass} whitespace-nowrap">${card.title}</span>
+                        <input type="text" value="${currentPlayerName}" oninput="updatePlayerName(${card.id}, this.value)" placeholder="Jugador" class="flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-0.5 text-[10px] text-white outline-none focus:border-indigo-500">
+                        <button type="button" onclick="removeActiveCard(${card.id})" class="text-rose-400 hover:text-rose-300 px-1 py-0.5 rounded text-[10px]" title="Eliminar">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                `;
+
+                let gridHTML = `<div class="grid grid-cols-5 gap-0.5 text-center font-black text-[10px] mb-0.5 ${cfg.activeLetterClass}"><div>B</div><div>I</div><div>N</div><div>G</div><div>O</div></div>`;
+                gridHTML += `<div class="grid grid-cols-5 gap-0.5">`;
+                
+                for (let r = 0; r < 5; r++) {
+                    for (let col = 0; col < 5; col++) {
+                        let val = card.numbers[r][col];
+                        let isFree = val === "FREE";
+                        let marked = isFree ? true : (window.cardMarks[card.id] && window.cardMarks[card.id][`${r}-${col}`]);
+                        let markedClass = marked ? cfg.markedClass : 'bg-slate-800 text-slate-200 border-slate-700';
+
+                        gridHTML += `<div id="cell-${card.id}-${r}-${col}" class="h-7 rounded text-[11px] font-bold flex items-center justify-center border ${isFree ? 'bg-indigo-600 text-white text-[8px]' : markedClass}">${isFree ? 'FREE' : val}</div>`;
+                    }
+                }
+                gridHTML += `</div>`;
+
+                cardWrapper.innerHTML = headerHTML + gridHTML;
+                container.appendChild(cardWrapper);
+            });
+            window.renderMasterBoard();
+            window.renderPlayerCards();
+            window.checkAllCardsForWins();
+        }
+
+        window.getMissingCellsForMode = function(card, marks, modeKey) {
+            let missing = [];
+            let mode = window.gameModes[modeKey];
+            if (!mode) return missing;
+
+            if (modeKey === 'blackout') {
+                for (let r = 0; r < 5; r++) {
+                    for (let c = 0; c < 5; c++) {
+                        if (!marks[`${r}-${c}`]) missing.push({r, c});
+                    }
+                }
+            } else if (modeKey === 'diagonal') {
+                let d1Unmarked = [];
+                for (let i = 0; i < 5; i++) { if (!marks[`${i}-${i}`]) d1Unmarked.push({r: i, c: i}); }
+                let d2Unmarked = [];
+                for (let i = 0; i < 5; i++) { if (!marks[`${i}-${4-i}`]) d2Unmarked.push({r: i, c: 4-i}); }
+                if (d1Unmarked.length === 1) missing.push(d1Unmarked[0]);
+                if (d2Unmarked.length === 1) missing.push(d2Unmarked[0]);
+            } else if (modeKey === 'horizontal') {
+                for (let r = 0; r < 5; r++) {
+                    let rowUnmarked = [];
+                    for (let c = 0; c < 5; c++) { if (!marks[`${r}-${c}`]) rowUnmarked.push({r, c}); }
+                    if (rowUnmarked.length === 1) missing.push(rowUnmarked[0]);
+                }
+            } else if (modeKey === 'vertical') {
+                for (let c = 0; c < 5; c++) {
+                    let colUnmarked = [];
+                    for (let r = 0; r < 5; r++) { if (!marks[`${r}-${c}`]) colUnmarked.push({r, c}); }
+                    if (colUnmarked.length === 1) missing.push(colUnmarked[0]);
+                }
+            } else if (modeKey === 'corners') {
+                let corners = [{r:0, c:0}, {r:0, c:4}, {r:4, c:0}, {r:4, c:4}];
+                let unmar = corners.filter(pos => !marks[`${pos.r}-${pos.c}`]);
+                if (unmar.length === 1) missing.push(unmar[0]);
+            } else {
+                let patternUnmarked = [];
+                for (let r = 0; r < 5; r++) {
+                    for (let c = 0; c < 5; c++) {
+                        if (mode.isCellInPattern(r, c) && !marks[`${r}-${c}`]) {
+                            patternUnmarked.push({r, c});
+                        }
+                    }
+                }
+                if (patternUnmarked.length === 1) {
+                    missing.push(patternUnmarked[0]);
+                }
+            }
+            return missing;
+        }
+
+        window.getAllMissingNumbersAcrossCards = function() {
+            let missingNumbersSet = new Set();
+            window.selectedCardsIds.forEach(id => {
+                let card = window.allAvailableCards.find(c => c.id === id);
+                if (!card) return;
+                let marks = window.cardMarks[card.id] || {};
+
+                for (let mKey in window.gameModes) {
+                    let mode = window.gameModes[mKey];
+                    if (!mode.active) continue;
+                    let missing = window.getMissingCellsForMode(card, marks, mKey);
+                    if (missing.length === 1) {
+                        missing.forEach(pos => {
+                            let num = card.numbers[pos.r][pos.c];
+                            if (typeof num === 'number') missingNumbersSet.add(num);
+                        });
+                    }
+                }
+            });
+            return missingNumbersSet;
+        }
+
+        window.renderPlayerCards = function() {
+            let nearWinContainer = document.getElementById('near-win-cards-container');
+            let nearWinCountBadge = document.getElementById('near-win-count-badge');
+            let nearWinListHTML = '';
+            let totalNearWinCount = 0;
+
+            window.selectedCardsIds.forEach(id => {
+                let card = window.allAvailableCards.find(c => c.id === id);
+                if (!card) return;
+                let cfg = window.getCardColorConfig(card.color);
+                let marks = window.cardMarks[card.id] || {};
+                let pName = window.playerNames[card.id] || "Sin nombre";
+
+                let missingCellsMap = {};
+                for (let mKey in window.gameModes) {
+                    let mode = window.gameModes[mKey];
+                    if (!mode.active) continue;
+                    let missing = window.getMissingCellsForMode(card, marks, mKey);
+                    if (missing.length === 1) {
+                        missing.forEach(pos => {
+                            missingCellsMap[`${pos.r}-${pos.c}`] = true;
+                            totalNearWinCount++;
+                            nearWinListHTML += `<div class="text-[10px] bg-amber-500/10 border border-amber-500/30 rounded px-2 py-1 text-amber-300 flex justify-between items-center">
+                                <span><b>${card.title}</b> (${pName})</span>
+                                <span class="bg-amber-500 text-slate-950 font-bold px-1.5 py-0.5 rounded text-[9px]">Falta: ${card.numbers[pos.r][pos.c]}</span>
+                            </div>`;
+                        });
+                    }
+                }
+
+                for (let r = 0; r < 5; r++) {
+                    for (let col = 0; col < 5; col++) {
+                        let val = card.numbers[r][col];
+                        let btn = document.getElementById(`cell-${card.id}-${r}-${col}`);
+                        if (!btn) continue;
+
+                        if (val === "FREE") continue;
+
+                        let isMarked = marks[`${r}-${col}`];
+                        let isMissing = missingCellsMap[`${r}-${col}`];
+
+                        if (isMarked) {
+                            btn.className = `h-7 rounded text-[11px] font-bold flex items-center justify-center border ${cfg.markedClass}`;
+                        } else if (isMissing) {
+                            btn.className = `h-7 rounded text-[11px] font-bold flex items-center justify-center border bg-amber-500 text-slate-950 animate-pulse font-extrabold`;
+                        } else {
+                            btn.className = `h-7 rounded text-[11px] font-bold flex items-center justify-center border bg-slate-800 text-slate-200 border-slate-700`;
+                        }
+                    }
+                }
+            });
+
+            if (nearWinContainer) {
+                nearWinContainer.innerHTML = nearWinListHTML || `<div class="text-[10px] text-slate-400 text-center py-2 italic">Ningún cartón a pique por ahora...</div>`;
+            }
+            if (nearWinCountBadge) {
+                nearWinCountBadge.textContent = `${totalNearWinCount} a pique`;
+            }
+
+            window.renderMasterBoard();
+            
+            // Si el proyector está abierto, actualizar también sus elementos dinámicos
+            if (!document.getElementById('projector-modal').classList.contains('hidden')) {
+                window.renderProjectorBoard();
+            }
+        }
+
+        window.renderMasterBoard = function() {
+            const container = document.getElementById('master-board-columns');
+            const recentContainer = document.getElementById('recent-balls-history');
+            if (!container) return;
+            container.innerHTML = '';
+            const letters = ['B', 'I', 'N', 'G', 'O'];
+            
+            let missingNumbersSet = window.getAllMissingNumbersAcrossCards();
+            
+            // Renderizar historial de últimas bolas
+            if (recentContainer) {
+                if (window.drawnHistoryArray.length === 0) {
+                    recentContainer.innerHTML = `<span class="text-[10px] text-slate-500 italic">Ninguna bola aún</span>`;
+                } else {
+                    recentContainer.innerHTML = '';
+                    let ultimas = window.drawnHistoryArray.slice(-8).reverse();
+                    ultimas.forEach(num => {
+                        let span = document.createElement('span');
+                        span.className = "bg-indigo-600 text-white font-black px-2 py-0.5 rounded text-[10px] shadow-sm";
+                        span.textContent = num;
+                        recentContainer.appendChild(span);
+                    });
+                }
+            }
+
+            for (let col = 0; col < 5; col++) {
+                const colDiv = document.createElement('div');
+                colDiv.className = 'flex flex-col gap-0.5';
+                colDiv.innerHTML = `<div class="bg-indigo-600 text-white font-bold text-center text-[10px] py-0.5 rounded">${letters[col]}</div>`;
+               
+                for (let row = 1; row <= 15; row++) {
+                    const num = col * 15 + row;
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.id = `master-num-${num}`;
+                    
+                    let isDrawn = window.masterMarkedNumbers.has(num);
+                    let isMissingForWin = missingNumbersSet.has(num) && !isDrawn;
+                    
+                    let cssClass = 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white';
+                    if (isDrawn) {
+                        cssClass = 'master-cell-marked';
+                    } else if (isMissingForWin) {
+                        cssClass = 'master-cell-missing';
+                    }
+
+                    btn.className = `h-4 sm:h-5 flex items-center justify-center text-[9px] font-bold rounded border ${cssClass}`;
+                    btn.textContent = num;
+                    btn.onclick = () => window.toggleMasterNumber(num);
+                    colDiv.appendChild(btn);
+                }
+                container.appendChild(colDiv);
+            }
+            window.updateDrawnCountBadge();
+        }
+
+        window.toggleMasterNumber = function(num) {
+            if (window.masterMarkedNumbers.has(num)) {
+                window.masterMarkedNumbers.delete(num);
+                window.autoUnmarkNumberOnCards(num);
+                window.drawnHistoryArray = window.drawnHistoryArray.filter(n => n !== num);
+            } else {
+                window.masterMarkedNumbers.add(num);
+                window.autoMarkNumberOnCards(num);
+                if (!window.drawnHistoryArray.includes(num)) {
+                    window.drawnHistoryArray.push(num);
+                }
+            }
+            window.renderMasterBoard();
+            window.renderPlayerCards();
+            window.checkAllCardsForWins();
+            window.guardarEstadoEnLocalStorage();
+        }
+
+        window.autoMarkNumberOnCards = function(num) {
+            window.selectedCardsIds.forEach(id => {
+                let card = window.allAvailableCards.find(c => c.id === id);
+                if (!card) return;
+                for (let r = 0; r < 5; r++) {
+                    for (let col = 0; col < 5; col++) {
+                        if (card.numbers[r][col] === num) {
+                            if (!window.cardMarks[card.id]) window.cardMarks[card.id] = {};
+                            window.cardMarks[card.id][`${r}-${col}`] = true;
+                        }
+                    }
+                }
+            });
+        }
+
+        window.autoUnmarkNumberOnCards = function(num) {
+            window.selectedCardsIds.forEach(id => {
+                let card = window.allAvailableCards.find(c => c.id === id);
+                if (!card) return;
+                for (let r = 0; r < 5; r++) {
+                    for (let col = 0; col < 5; col++) {
+                        if (card.numbers[r][col] === num) {
+                            if (window.cardMarks[card.id]) window.cardMarks[card.id][`${r}-${col}`] = false;
+                        }
+                    }
+                }
+            });
+        }
+
+        window.getWonModalitiesForCard = function(cardId) {
+            let marks = window.cardMarks[cardId] || {};
+            let wonModesNames = [];
+
+            for (let mKey in window.gameModes) {
+                let mode = window.gameModes[mKey];
+                if (!mode.active) continue;
+                let isWon = false;
+
+                if (mKey === 'blackout') {
+                    let allMarked = true;
+                    for (let r = 0; r < 5; r++) {
+                        for (let c = 0; c < 5; c++) {
+                            if (!marks[`${r}-${c}`]) allMarked = false;
+                        }
+                    }
+                    if (allMarked) isWon = true;
+                } else if (mKey === 'diagonal') {
+                    let d1 = [0,1,2,3,4].every(i => marks[`${i}-${i}`]);
+                    let d2 = [0,1,2,3,4].every(i => marks[`${i}-${4-i}`]);
+                    if (d1 || d2) isWon = true;
+                } else if (mKey === 'horizontal') {
+                    for (let r = 0; r < 5; r++) {
+                        if ([0,1,2,3,4].every(c => marks[`${r}-${c}`])) isWon = true;
+                    }
+                } else if (mKey === 'vertical') {
+                    for (let c = 0; c < 5; c++) {
+                        if ([0,1,2,3,4].every(r => marks[`${r}-${c}`])) isWon = true;
+                    }
+                } else if (mKey === 'corners') {
+                    if (marks['0-0'] && marks['0-4'] && marks['4-0'] && marks['4-4']) isWon = true;
+                } else {
+                    let customWon = true;
+                    for (let r = 0; r < 5; r++) {
+                        for (let c = 0; c < 5; c++) {
+                            if (mode.isCellInPattern(r, c) && !marks[`${r}-${c}`]) {
+                                customWon = false;
+                            }
+                        }
+                    }
+                    if (customWon) isWon = true;
+                }
+
+                if (isWon) {
+                    wonModesNames.push(mode.name);
+                }
+            }
+            return wonModesNames;
+        }
+
+        window.checkAllCardsForWins = function() {
+            let winningInfoList = [];
+            window.selectedCardsIds.forEach(id => {
+                let wonModes = window.getWonModalitiesForCard(id);
+                if (wonModes.length > 0) {
+                    let newWonModesForThisCard = wonModes.filter(modName => {
+                        let uniqueKeyWin = `${id}_${modName}`;
+                        return !window.alreadyDeclaredWins.has(uniqueKeyWin);
+                    });
+
+                    if (newWonModesForThisCard.length > 0) {
+                        newWonModesForThisCard.forEach(modName => {
+                            window.alreadyDeclaredWins.add(`${id}_${modName}`);
+                        });
+                        winningInfoList.push({ cardId: id, modalities: newWonModesForThisCard });
+                    }
+                }
+            });
+
+            if (winningInfoList.length > 0) {
+                window.guardarEstadoEnLocalStorage();
+                window.showWinModal(winningInfoList);
+            }
+        }
+
+        window.getWinningCellsSet = function(cardId, wonModalitiesNames) {
+            let marks = window.cardMarks[cardId] || {};
+            let winningCells = new Set();
+
+            for (let mKey in window.gameModes) {
+                let mode = window.gameModes[mKey];
+                if (!wonModalitiesNames.includes(mode.name)) continue;
+
+                if (mKey === 'blackout') {
+                    for (let r = 0; r < 5; r++) {
+                        for (let c = 0; c < 5; c++) winningCells.add(`${r}-${c}`);
+                    }
+                } else if (mKey === 'diagonal') {
+                    if ([0,1,2,3,4].every(i => marks[`${i}-${i}`])) {
+                        [0,1,2,3,4].forEach(i => winningCells.add(`${i}-${i}`));
+                    }
+                    if ([0,1,2,3,4].every(i => marks[`${i}-${4-i}`])) {
+                        [0,1,2,3,4].forEach(i => winningCells.add(`${i}-${4-i}`));
+                    }
+                } else if (mKey === 'horizontal') {
+                    for (let r = 0; r < 5; r++) {
+                        if ([0,1,2,3,4].every(c => marks[`${r}-${c}`])) {
+                            for (let c = 0; c < 5; c++) winningCells.add(`${r}-${c}`);
+                        }
+                    }
+                } else if (mKey === 'vertical') {
+                    for (let c = 0; c < 5; c++) {
+                        if ([0,1,2,3,4].every(r => marks[`${r}-${c}`])) {
+                            for (let r = 0; r < 5; r++) winningCells.add(`${r}-${c}`);
+                        }
+                    }
+                } else if (mKey === 'corners') {
+                    ['0-0', '0-4', '4-0', '4-4'].forEach(pos => winningCells.add(pos));
+                } else {
+                    for (let r = 0; r < 5; r++) {
+                        for (let c = 0; c < 5; c++) {
+                            if (mode.isCellInPattern(r, c)) winningCells.add(`${r}-${c}`);
+                        }
+                    }
+                }
+            }
+            return winningCells;
+        }
+
+        window.showWinModal = function(winningInfoList) {
+            const modal = document.getElementById('win-modal');
+            const container = document.getElementById('winning-cards-preview-container');
+            if (!modal || !container) return;
+            container.innerHTML = '';
+
+            winningInfoList.forEach(item => {
+                let card = window.allAvailableCards.find(c => c.id === item.cardId);
+                if (!card) return;
+                let playerName = window.playerNames[card.id] || "Jugador sin nombre";
+                let modalitiesText = item.modalities.join(", ");
+                let winningCells = window.getWinningCellsSet(card.id, item.modalities);
+
+                let div = document.createElement('div');
+                div.className = 'mini-carton-ganador';
+                div.innerHTML = `
+                    <h4>${card.title}</h4>
+                    <div class="ganador-jugador"><i class="fa-solid fa-user"></i> ${playerName}</div>
+                    <div class="ganador-modalidad"><i class="fa-solid fa-trophy"></i> ${modalitiesText}</div>
+                `;
+
+                let grid = document.createElement('div');
+                grid.className = 'mini-grid';
+                for (let r = 0; r < 5; r++) {
+                    for (let c = 0; c < 5; c++) {
+                        let val = card.numbers[r][c];
+                        let cell = document.createElement('div');
+                        cell.className = 'mini-celda';
+                        if (val === "FREE") {
+                            cell.classList.add('libre');
+                            cell.textContent = 'FREE';
+                        } else {
+                            cell.textContent = val;
+                            if (winningCells.has(`${r}-${c}`)) {
+                                cell.classList.add('ganadora');
+                            }
+                        }
+                        grid.appendChild(cell);
+                    }
+                }
+                div.appendChild(grid);
+                container.appendChild(div);
+            });
+            modal.classList.remove('hidden');
+        }
+
+        window.closeWinModal = function() {
+            document.getElementById('win-modal').classList.add('hidden');
+        }
+
+        window.openProjectorMode = function() {
+            const modal = document.getElementById('projector-modal');
+            if (!modal) return;
+            modal.classList.remove('hidden');
+            window.renderProjectorBoard();
+        }
+
+        window.closeProjectorMode = function() {
+            document.getElementById('projector-modal').classList.add('hidden');
+        }
+
+        window.renderProjectorBoard = function() {
+            const grid = document.getElementById('projector-board-grid');
+            const badge = document.getElementById('projector-count-badge');
+            const recentProj = document.getElementById('projector-recent-balls');
+            const modalitiesProj = document.getElementById('projector-modalities-bar');
+            const nearWinProj = document.getElementById('projector-near-win-container');
+
+            if (!grid) return;
+
+            if (badge) badge.textContent = `${window.masterMarkedNumbers.size} cantados`;
+
+            // 1. Renderizar últimas bolas en proyector
+            if (recentProj) {
+                if (window.drawnHistoryArray.length === 0) {
+                    recentProj.innerHTML = `<span class="text-[10px] text-slate-500 italic">Ninguna</span>`;
+                } else {
+                    recentProj.innerHTML = '';
+                    let ultimas = window.drawnHistoryArray.slice(-6).reverse();
+                    ultimas.forEach(num => {
+                        let span = document.createElement('span');
+                        span.className = "bg-indigo-600 text-white font-black px-2 py-0.5 rounded text-[10px] shadow-sm";
+                        span.textContent = num;
+                        recentProj.appendChild(span);
+                    });
+                }
+            }
+
+            // 2. Renderizar miniaturas de modalidades activas en proyector
+            if (modalitiesProj) {
+                modalitiesProj.innerHTML = '';
+                let hayActivas = false;
+                for (let key in window.gameModes) {
+                    let mode = window.gameModes[key];
+                    if (mode.active) {
+                        hayActivas = true;
+                        let item = document.createElement('div');
+                        item.className = "flex items-center gap-1 bg-slate-950 border border-indigo-500/30 px-1.5 py-0.5 rounded text-[10px] text-indigo-300 shrink-0";
+                        item.innerHTML = `${window.generateMiniDiagramHTML(mode.isCellInPattern)} <span class="font-semibold">${mode.name}</span>`;
+                        modalitiesProj.appendChild(item);
+                    }
+                }
+                if (!hayActivas) modalitiesProj.innerHTML = `<span class="text-[10px] text-slate-500 italic">Sin modalidades activas</span>`;
+            }
+
+            // 3. Renderizar cartones a pique en proyector
+            if (nearWinProj) {
+                nearWinProj.innerHTML = '';
+                let nearWinCount = 0;
+                let nearWinHTML = '';
+
+                window.selectedCardsIds.forEach(id => {
+                    let card = window.allAvailableCards.find(c => c.id === id);
+                    if (!card) return;
+                    let marks = window.cardMarks[card.id] || {};
+                    let pName = window.playerNames[card.id] || "Sin nombre";
+
+                    for (let mKey in window.gameModes) {
+                        let mode = window.gameModes[mKey];
+                        if (!mode.active) continue;
+                        let missing = window.getMissingCellsForMode(card, marks, mKey);
+                        if (missing.length === 1) {
+                            missing.forEach(pos => {
+                                nearWinCount++;
+                                nearWinHTML += `<div class="text-[9px] bg-amber-500/20 border border-amber-500/40 rounded px-1.5 py-0.5 text-amber-300 whitespace-nowrap">
+                                    <b>${card.title}</b> (${pName}) - <span class="bg-amber-500 text-slate-950 font-bold px-1 rounded">Falta: ${card.numbers[pos.r][pos.c]}</span>
+                                </div>`;
+                            });
+                        }
+                    }
+                });
+
+                if (nearWinCount > 0) {
+                    nearWinProj.innerHTML = nearWinHTML;
+                } else {
+                    nearWinProj.innerHTML = `<span class="text-[10px] text-slate-500 italic">Ninguno a pique</span>`;
+                }
+            }
+
+            // 4. Renderizar el Tablero Maestro Gigante
+            grid.innerHTML = '';
+            const letters = ['B', 'I', 'N', 'G', 'O'];
+            let missingNumbersSet = window.getAllMissingNumbersAcrossCards();
+
+            for (let col = 0; col < 5; col++) {
+                const colDiv = document.createElement('div');
+                colDiv.className = 'flex flex-col gap-1';
+                colDiv.innerHTML = `<div class="bg-indigo-600 text-white font-black text-center text-xs sm:text-sm py-1 rounded-lg shadow">${letters[col]}</div>`;
+
+                for (let row = 1; row <= 15; row++) {
+                    const num = col * 15 + row;
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    
+                    let isDrawn = window.masterMarkedNumbers.has(num);
+                    let isMissing = missingNumbersSet.has(num) && !isDrawn;
+
+                    let cssClass = 'bg-slate-950 text-slate-400 border-slate-800 hover:border-indigo-500 hover:text-white';
+                    if (isDrawn) {
+                        cssClass = 'master-cell-marked text-white';
+                    } else if (isMissing) {
+                        cssClass = 'master-cell-missing';
+                    }
+
+                    btn.className = `h-7 sm:h-8 flex items-center justify-center text-xs sm:text-sm font-black rounded-md border transition-all ${cssClass}`;
+                    btn.textContent = num;
+                    
+                    btn.onclick = () => {
+                        window.toggleMasterNumber(num);
+                        window.renderProjectorBoard();
+                    };
+
+                    colDiv.appendChild(btn);
+                }
+                grid.appendChild(colDiv);
+            }
+        }
+
+        window.updateDrawnCountBadge = function() {
+            document.getElementById('drawn-count-badge').textContent = `${window.masterMarkedNumbers.size} cantados`;
+        }
+
+        window.clearAllMarks = function() {
+            window.cardMarks = {};
+            window.alreadyDeclaredWins.clear();
+            window.selectedCardsIds.forEach(id => window.cardMarks[id] = { "2-2": true });
+            window.renderPlayerCards();
+            window.guardarEstadoEnLocalStorage();
+        }
+
+        window.resetGame = function() {
+            window.masterMarkedNumbers.clear();
+            window.drawnHistoryArray = [];
+            window.cardMarks = {};
+            window.alreadyDeclaredWins.clear();
+            window.selectedCardsIds.forEach(id => window.cardMarks[id] = { "2-2": true });
+            window.renderMasterBoard();
+            window.renderPlayerCards();
+            window.closeWinModal();
+            window.guardarEstadoEnLocalStorage();
+        }
+
+        window.downloadApp = function() {
+            const blob = new Blob([document.documentElement.outerHTML], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'aplicacion_copia_3.html';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>

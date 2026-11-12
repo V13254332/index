@@ -1,0 +1,1891 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplicación de Bingo Profesional - Conectada a Firebase</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                }
+            }
+        }
+    </script>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            max-width: 100vw;
+            overflow-x: hidden;
+        }
+
+        /* NUEVOS ESTILOS PARA EL MODAL GANADOR MÚLTIPLE Y CONFETI */
+        #win-modal > div {
+            max-width: 600px !important;
+            width: 90% !important;
+        }
+        .cartones-ganadores-grid {
+            display: flex; flex-wrap: wrap; gap: 15px;
+            justify-content: center; max-height: 350px; overflow-y: auto; margin: 15px 0;
+        }
+        .mini-carton-ganador {
+            background: #1e293b; color: #fff; padding: 10px; border-radius: 8px; width: 160px;
+            border: 1px solid rgba(255,215,0,0.4);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        .mini-carton-ganador h4 { font-size: 11px; margin-bottom: 6px; color: #ffD700; font-weight: bold; }
+        .mini-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; }
+        .mini-celda {
+            background: #334155; font-size: 9px; height: 22px;
+            display: flex; align-items: center; justify-content: center; border-radius: 3px; font-weight: bold; color: #cbd5e1;
+        }
+        .mini-celda.ganadora { background: #ef4444 !important; color: white !important; transform: scale(1.05); }
+        .mini-celda.libre { background: #10b981 !important; color: white !important; font-size: 7px; }
+
+        /* Fichas marcadas dinámicas según el color del cartón */
+        .bingo-cell-marked-emerald {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+            color: white !important;
+            border-color: #34d399 !important;
+            transform: scale(0.95);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .bingo-cell-marked-purple {
+            background: linear-gradient(135deg, #9333ea 0%, #7e22ce 100%) !important;
+            color: white !important;
+            border-color: #c084fc !important;
+            transform: scale(0.95);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .bingo-cell-marked-blue {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+            color: white !important;
+            border-color: #60a5fa !important;
+            transform: scale(0.95);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .bingo-cell-marked-rose {
+            background: linear-gradient(135deg, #db2777 0%, #be185d 100%) !important;
+            color: white !important;
+            border-color: #f472b6 !important;
+            transform: scale(0.95);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .bingo-cell-marked-indigo {
+            background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%) !important;
+            color: white !important;
+            border-color: #818cf8 !important;
+            transform: scale(0.95);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .master-cell-marked {
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important;
+            color: white !important;
+            border-color: #4338ca !important;
+            box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);
+        }
+        
+        /* Clases de parpadeo para el Tablero Maestro */
+        .master-cell-pending-emerald {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+            color: white !important;
+            border-color: #34d399 !important;
+            box-shadow: 0 0 8px rgba(52, 211, 153, 0.8), inset 0 0 4px rgba(255,255,255,0.4);
+            animation: pulse-emerald 1.5s infinite;
+        }
+        .master-cell-pending-purple {
+            background: linear-gradient(135deg, #9333ea 0%, #7e22ce 100%) !important;
+            color: white !important;
+            border-color: #c084fc !important;
+            box-shadow: 0 0 8px rgba(192, 132, 252, 0.8), inset 0 0 4px rgba(255,255,255,0.4);
+            animation: pulse-purple 1.5s infinite;
+        }
+        .master-cell-pending-blue {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+            color: white !important;
+            border-color: #60a5fa !important;
+            box-shadow: 0 0 8px rgba(96, 165, 250, 0.8), inset 0 0 4px rgba(255,255,255,0.4);
+            animation: pulse-blue 1.5s infinite;
+        }
+        .master-cell-pending-rose {
+            background: linear-gradient(135deg, #db2777 0%, #be185d 100%) !important;
+            color: white !important;
+            border-color: #f472b6 !important;
+            box-shadow: 0 0 8px rgba(244, 114, 182, 0.8), inset 0 0 4px rgba(255,255,255,0.4);
+            animation: pulse-rose 1.5s infinite;
+        }
+        .master-cell-pending-indigo {
+            background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%) !important;
+            color: white !important;
+            border-color: #818cf8 !important;
+            box-shadow: 0 0 8px rgba(129, 140, 248, 0.8), inset 0 0 4px rgba(255,255,255,0.4);
+            animation: pulse-indigo 1.5s infinite;
+        }
+
+        @keyframes pulse-emerald { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+        @keyframes pulse-purple { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+        @keyframes pulse-blue { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+        @keyframes pulse-rose { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+        @keyframes pulse-indigo { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+
+        .double-frame {
+            border: 3px solid #6366f1;
+            box-shadow: 0 0 0 2px #334155, 0 8px 20px -4px rgba(0, 0, 0, 0.4);
+        }
+        @keyframes titilarIntenso {
+          0% { opacity: 1; transform: scale(1); background-color: #f59e0b; box-shadow: 0 0 5px #f59e0b; }
+          50% { opacity: 0.3; transform: scale(1.08); background-color: #d97706; box-shadow: 0 0 15px #fbbf24; }
+          100% { opacity: 1; transform: scale(1); background-color: #f59e0b; box-shadow: 0 0 5px #f59e0b; }
+        }
+
+        .master-cell-titilar {
+          animation: titilarIntenso 0.8s infinite ease-in-out !important;
+          color: #ffffff !important;
+          border: 2px solid #fef08a !important;
+          font-weight: 900 !important;
+        }
+
+        .cards-horizontal-container {
+            display: grid !important;
+            grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+            gap: 0.75rem !important;
+            max-height: 50vh !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            width: 100% !important;
+        }
+        
+        @media (min-width: 640px) {
+            .cards-horizontal-container {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            }
+        }
+        
+        .cards-horizontal-container > div {
+            width: 100% !important;
+            min-width: 0 !important;
+        }
+    </style>
+
+    <!-- Firebase SDKs y Conexión Dinámica -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "TU_API_KEY",
+            authDomain: "bingo-de-yois.firebaseapp.com",
+            databaseURL: "https://bingo-de-yois-default-rtdb.firebaseio.com",
+            projectId: "bingo-de-yois",
+            storageBucket: "bingo-de-yois.appspot.com",
+            messagingSenderId: "TU_MESSAGING_SENDER_ID",
+            appId: "TU_APP_ID"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        window.allAvailableCards = [];
+
+        async function cargarCartonesDesdeFirebase() {
+            try {
+                const dbRef = ref(db);
+                const snapshot = await get(dbRef);
+                
+                if (snapshot.exists()) {
+                    const datosCompletos = snapshot.val();
+                    const datos = datosCompletos.cartones || datosCompletos;
+                    
+                    let cartonesCargados = [];
+                    let idGlobalContador = 1;
+
+                    Object.keys(datos).forEach(nombreColorKey => {
+                        let nodoColor = datos[nombreColorKey];
+                        if (!nodoColor || typeof nodoColor !== 'object') return;
+
+                        let nombreBonito = nombreColorKey.charAt(0).toUpperCase() + nombreColorKey.slice(1);
+                        let temaCss = 'indigo';
+                        let lowerColor = nombreColorKey.toLowerCase();
+
+                        if (lowerColor.includes('verde')) {
+                            temaCss = 'emerald';
+                        } else if (lowerColor.includes('morado') || lowerColor.includes('violeta') || lowerColor.includes('purple')) {
+                            temaCss = 'purple';
+                        } else if (lowerColor.includes('azul')) {
+                            temaCss = 'blue';
+                        } else if (lowerColor.includes('roj') || lowerColor.includes('ros') || lowerColor.includes('pink')) {
+                            temaCss = 'rose';
+                        } else {
+                            temaCss = 'indigo'; 
+                        }
+                        let contadorColorLocal = 1;
+
+                        const extraerDeNodo = (nodoActual, subNombreLote) => {
+                            if (!nodoActual || typeof nodoActual !== 'object') return;
+
+                            let keys = Object.keys(nodoActual);
+                            let esContenedorDeCartones = keys.some(k => !isNaN(k) && typeof nodoActual[k] === 'object' && nodoActual[k] !== null);
+
+                            if (esContenedorDeCartones) {
+                                keys.forEach(keyCarton => {
+                                    if (isNaN(keyCarton)) return;
+                                    let cartonContainer = nodoActual[keyCarton];
+                                    if (!cartonContainer || typeof cartonContainer !== 'object') return;
+
+                                    let idCartonFinal = cartonContainer.id || cartonContainer.carton_id || keyCarton;
+                                    let numeroLimpio = parseInt(String(idCartonFinal).replace(/\D/g, '')) || parseInt(keyCarton) || 0;
+
+                                    let debeInvertir = false;
+                                    let lowerColor = nombreColorKey.toLowerCase();
+
+                                    if (lowerColor.includes('verde')) {
+                                        debeInvertir = true;
+                                    } else if (lowerColor.includes('azul') && numeroLimpio >= 61 && numeroLimpio <= 120) {
+                                        debeInvertir = true;
+                                    }
+
+                                    let matrizFinal = Array(5).fill(0).map(() => Array(5).fill(0));
+                                    let datosCargados = false;
+                                    let letrasBingo = ['B', 'I', 'N', 'G', 'O'];
+                                    let tieneLetrasBingo = letrasBingo.some(l => cartonContainer[l] !== undefined);
+
+                                    if (tieneLetrasBingo || cartonContainer.columns) {
+                                        let cols = cartonContainer.columns || cartonContainer;
+                                        letrasBingo.forEach((letra, cIndex) => {
+                                            let colData = cols[letra];
+                                            if (colData && typeof colData === 'object') {
+                                                for (let rIndex = 0; rIndex < 5; rIndex++) {
+                                                    let val = colData[rIndex] !== undefined ? colData[rIndex] : colData[String(rIndex)];
+                                                    if (val !== undefined) {
+                                                        matrizFinal[rIndex][cIndex] = (val === "FREE") ? "FREE" : (parseInt(val) || 0);
+                                                    }
+                                                }
+                                                datosCargados = true;
+                                            }
+                                        });
+                                    }
+
+                                    if (!datosCargados) {
+                                        let fuenteMatriz = cartonContainer.matrix || cartonContainer;
+                                        for (let r = 0; r < 5; r++) {
+                                            let filaObj = fuenteMatriz[r] || fuenteMatriz[String(r)];
+                                            if (filaObj && typeof filaObj === 'object') {
+                                                for (let c = 0; c < 5; c++) {
+                                                    let val = filaObj[c] !== undefined ? filaObj[c] : filaObj[String(c)];
+                                                    if (val !== undefined) {
+                                                        if (debeInvertir) {
+                                                            matrizFinal[c][r] = (val === "FREE") ? "FREE" : (parseInt(val) || 0);
+                                                        } else {
+                                                            matrizFinal[r][c] = (val === "FREE") ? "FREE" : (parseInt(val) || 0);
+                                                        }
+                                                        datosCargados = true;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if (!datosCargados && Array.isArray(cartonContainer.numbers)) {
+                                        let idx = 0;
+                                        for (let r = 0; r < 5; r++) {
+                                            for (let c = 0; c < 5; c++) {
+                                                let val = cartonContainer.numbers[idx++];
+                                                matrizFinal[r][c] = (val === "FREE") ? "FREE" : (parseInt(val) || 0);
+                                            }
+                                        }
+                                    }
+
+                                    matrizFinal[2][2] = "FREE";
+
+                                    let idUnicoGlobal = idGlobalContador++;
+
+                                    cartonesCargados.push({
+                                        id: idUnicoGlobal,
+                                        title: `Cartón #${idCartonFinal}`,
+                                        batch: subNombreLote,
+                                        color: temaCss,
+                                        numbers: matrizFinal
+                                    });
+                                });
+                            } else {
+                                keys.forEach(subKey => {
+                                    extraerDeNodo(nodoActual[subKey], `${subNombreLote} - ${subKey}`);
+                                });
+                            }
+                        };
+
+                        extraerDeNodo(nodoColor, nombreBonito);
+                    });
+
+                    if (cartonesCargados.length > 0) {
+                        window.allAvailableCards = cartonesCargados;
+                        
+                        let sesionRecuperada = cargarEstadoDesdeLocalStorage();
+                        if (!sesionRecuperada || selectedCardsIds.length === 0) {
+                            selectedCardsIds = [];
+                        }
+                        
+                        if (typeof renderMasterBoard === 'function') renderMasterBoard();
+                        if (typeof buildCardSelectorModalList === 'function') buildCardSelectorModalList();
+                        if (typeof initModalitiesList === 'function') initModalitiesList();
+                        if (typeof initActiveCards === 'function') initActiveCards();
+                        if (typeof initCustomDrawGrid === 'function') initCustomDrawGrid();
+                        if (typeof updateMasterBoardPendingHighlights === 'function') updateMasterBoardPendingHighlights();
+                        
+                        updateMasterBoardDisplay();
+                        updateDrawnCountBadge();
+                        renderPlayerCards();
+                    }
+                }
+            } catch (error) {
+                console.error("Error al cargar cartones:", error);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (typeof renderMasterBoard === 'function') renderMasterBoard();
+            if (typeof initCustomDrawGrid === 'function') initCustomDrawGrid();
+            cargarCartonesDesdeFirebase();
+        });
+    </script>
+</head>
+<body class="bg-slate-900 text-slate-100 h-full flex flex-col font-sans overflow-x-hidden text-xs">
+
+    <!-- Header compacto -->
+    <header class="bg-slate-800 border-b border-slate-700 px-3 py-2 flex flex-wrap justify-between items-center shadow-md">
+        <div class="flex items-center space-x-2">
+            <div class="bg-gradient-to-tr from-indigo-600 to-violet-500 p-1.5 rounded-lg shadow-md text-white">
+                <i class="fa-solid fa-ticket text-sm"></i>
+            </div>
+            <div>
+                <h1 class="text-xs sm:text-sm font-bold tracking-tight text-white flex items-center gap-1.5">
+                  <span>BINGO DE YOIS</span>
+                  <span class="text-[9px] bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 px-1.5 py-0.2 rounded-full font-medium">Cloud</span>
+                </h1>
+                <p class="text-[10px] text-slate-400 hidden sm:block">Sistema profesional de 75 bolas</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-1.5">
+            <button onclick="toggleMobileLayout()" id="layout-toggle-btn" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-2 py-1.5 rounded-lg text-[11px] font-semibold transition border border-slate-600 flex items-center gap-1" title="Cambiar diseño en móviles">
+                <i class="fa-solid fa-columns text-indigo-400"></i> <span id="layout-toggle-text">Lado a Lado</span>
+            </button>
+            <button onclick="openCardSelectorModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition flex items-center gap-1 shadow-sm">
+                <i class="fa-solid fa-sliders"></i> Cartones
+            </button>
+            <button onclick="downloadApp()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 p-1.5 rounded-lg text-[11px] font-semibold transition border border-slate-600" title="Descargar App">
+                <i class="fa-solid fa-download text-indigo-400"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Layout -->
+    <main class="flex-1 max-w-[1600px] w-full mx-auto p-2 sm:p-4 flex flex-col lg:grid lg:grid-cols-12 gap-3 items-start" id="main-container-layout">
+        
+        <!-- Left Column (Tablero Maestro Compacto) -->
+        <section class="w-full lg:col-span-5 flex flex-col gap-3" id="master-board-section">
+            <div class="bg-slate-800 rounded-xl p-2 sm:p-3 shadow-xl flex flex-col double-frame flex-1">
+                <div class="flex justify-between items-center mb-1.5">
+                    <h3 class="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                        <i class="fa-solid fa-table-cells text-indigo-400"></i> Tablero Maestro
+                    </h3>
+                    <div class="flex items-center gap-1.5">
+                        <span id="drawn-count-badge" class="text-[9px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-1.5 py-0.5 rounded-full font-semibold">0 cantados</span>
+                        <button onclick="resetGame()" class="bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 px-1.5 py-0.5 rounded text-[9px] font-semibold transition flex items-center gap-1" title="Reiniciar tablero (conserva cartones)">
+                            <i class="fa-solid fa-rotate-right"></i> Reiniciar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- HISTORIAL DE ÚLTIMAS FICHAS CANTADAS (Movido aquí al Tablero Maestro) -->
+                <div class="mb-2 bg-slate-900 border border-indigo-500/30 rounded-lg p-1.5 flex items-center gap-1.5 overflow-x-auto shadow-inner">
+                    <span class="text-[9px] font-bold text-indigo-400 uppercase tracking-wider whitespace-nowrap"><i class="fa-solid fa-clock-rotate-left"></i> Últimas:</span>
+                    <div id="recent-balls-history" class="flex items-center gap-1">
+                        <span class="text-[10px] text-slate-500 italic">Ninguna bola aún</span>
+                    </div>
+                </div>
+
+                <!-- Tablero compacto optimizado -->
+                <div class="grid grid-cols-5 gap-1 flex-1" id="master-board-columns"></div>
+            </div>
+
+            <!-- SECCIÓN: Aviso de Cartones a Pique (Al final del Tablero Maestro) -->
+            <div class="bg-slate-800 border border-amber-500/40 rounded-xl p-2.5 shadow-xl flex flex-col gap-1.5">
+                <div class="flex items-center justify-between pb-1 border-b border-slate-700">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Cartones a Pique (¡A 1 ficha!)
+                    </span>
+                    <span id="near-win-count-badge" class="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded-full font-semibold">0 a pique</span>
+                </div>
+                <div id="near-win-cards-container" class="flex flex-col gap-1 max-h-36 overflow-y-auto">
+                    <div class="text-[10px] text-slate-400 text-center py-2 italic">Ningún cartón a pique por ahora...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Column (Modalidades Compactas y Cartones Activos) -->
+        <section class="w-full lg:col-span-7 flex flex-col gap-3" id="right-panel-section">
+            
+            <!-- Panel Superior Ultra Compacto -->
+            <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-lg overflow-hidden p-2 flex flex-col gap-1.5">
+                <div class="bg-slate-900 border border-indigo-500/30 rounded-lg p-1.5 flex items-center justify-between shadow-inner">
+                    <div class="flex items-center gap-2 overflow-x-auto py-0.5" id="active-modalities-preview-bar"></div>
+                    <button onclick="toggleModalitiesDropdown()" class="text-[10px] bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/40 px-2.5 py-1 rounded font-semibold whitespace-nowrap ml-1 flex items-center gap-1">
+                        <i class="fa-solid fa-sliders text-[10px]"></i> Config
+                    </button>
+                </div>
+
+                <!-- Acordeón oculto/plegable por defecto -->
+                <details id="modalities-details-box" class="group border border-slate-700/80 rounded-lg overflow-hidden bg-slate-900/50">
+                    <summary class="p-2 bg-slate-800 hover:bg-slate-700/50 cursor-pointer flex items-center justify-between transition select-none list-none text-[11px]">
+                        <span class="font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
+                            <i class="fa-solid fa-list-check text-indigo-400"></i> Seleccionar Modalidades Activas
+                        </span>
+                        <span id="mode-theme-badge" class="text-[9px] px-2 py-0.5 rounded font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Tema Activo</span>
+                    </summary>
+                    <div class="p-2.5 border-t border-slate-700/60 bg-slate-900/90 flex flex-col gap-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] text-slate-300">Patrones permitidos:</span>
+                            <button onclick="openCustomPatternModal()" class="text-[10px] bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/40 px-2 py-1 rounded font-semibold flex items-center gap-1">
+                                <i class="fa-solid fa-plus"></i> Crear Nuevo
+                            </button>
+                        </div>
+                        <div id="modalities-checkbox-container" class="bg-slate-950 border border-slate-800 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1.5"></div>
+                    </div>
+                </details>
+            </div>
+
+            <!-- Panel Inferior: Cartones Activos -->
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-2.5 shadow-xl flex flex-col gap-2">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Tus Cartones Activos</span>
+                        <span id="active-cards-subtitle" class="text-[10px] text-indigo-400 font-medium">0 cartones en mesa</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <label class="flex items-center gap-1 cursor-pointer bg-slate-700/50 hover:bg-slate-700 px-2 py-0.5 rounded-lg text-[10px] select-none transition border border-slate-600">
+                            <input type="checkbox" id="auto-mark-toggle" class="w-3 h-3 rounded text-indigo-600 focus:ring-indigo-500 bg-slate-900 border-slate-600" checked>
+                            <span class="font-medium text-slate-200">Auto</span>
+                        </label>
+                        <button onclick="clearAllMarks()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 p-1 rounded-lg text-[10px] transition border border-slate-600" title="Limpiar marcas">
+                            <i class="fa-solid fa-eraser"></i>
+                        </button>
+                        <button onclick="removeAllActiveCards()" class="bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 px-2 py-1 rounded-lg text-[10px] font-semibold transition flex items-center gap-1" title="Eliminar todos los cartones activos">
+                            <i class="fa-solid fa-trash-can"></i> Eliminar Todos
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Contenedor adaptativo de cartones -->
+                <div class="bg-slate-800/60 border border-slate-700/80 rounded-xl p-2 shadow-inner min-h-0 flex flex-col">
+                    <div class="cards-horizontal-container" id="active-cards-container"></div>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- Modal: Card Selector -->
+    <div id="card-selector-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+        <div class="bg-slate-800 border border-indigo-500/40 rounded-2xl p-4 sm:p-6 max-w-2xl w-full shadow-2xl flex flex-col max-h-[90vh]">
+            <div class="flex justify-between items-center mb-3 pb-2 border-b border-slate-700">
+                <div>
+                    <h3 class="text-sm sm:text-base font-bold text-white flex items-center gap-1.5">
+                        <i class="fa-solid fa-palette text-indigo-400"></i> Selector de Cartones
+                    </h3>
+                    <p class="text-[10px] text-slate-400">Elige los cartones para llevar a la mesa</p>
+                </div>
+                <button onclick="closeCardSelectorModal()" class="text-slate-400 hover:text-white p-1.5">
+                    <i class="fa-solid fa-xmark text-base"></i>
+                </button>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div class="flex gap-1.5">
+                    <button onclick="selectAllCards(true)" class="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition">
+                        Todos
+                    </button>
+                    <button onclick="selectAllCards(false)" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition">
+                        Ninguno
+                    </button>
+                </div>
+                <div class="w-full sm:w-48">
+                    <input type="text" id="card-search-input" oninput="filterCardSelector()" placeholder="Buscar..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500">
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto space-y-2.5 pr-1" id="selector-cards-list"></div>
+
+            <div class="mt-4 pt-3 border-t border-slate-700 flex justify-end">
+                <button onclick="applyCardSelection()" class="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold py-2.5 px-4 rounded-xl text-xs shadow-lg transition">
+                    Guardar Selección y Jugar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Custom Pattern Creator -->
+    <div id="custom-pattern-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+        <div class="bg-slate-800 border border-indigo-500/40 rounded-2xl p-4 max-w-xs w-full shadow-2xl flex flex-col">
+            <div class="flex justify-between items-center mb-3 pb-2 border-b border-slate-700">
+                <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
+                    <i class="fa-solid fa-pencil text-indigo-400"></i> Patrón Personalizado
+                </h3>
+                <button onclick="closeCustomPatternModal()" class="text-slate-400 hover:text-white p-1">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+
+            <div class="mb-3">
+                <label class="block text-[10px] font-semibold text-slate-300 mb-1">Nombre:</label>
+                <input type="text" id="custom-pattern-name" placeholder="Ej. La Letra X" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500">
+            </div>
+
+            <div class="flex flex-col items-center justify-center mb-4">
+                <span class="text-[10px] text-slate-400 mb-1.5">Cuadrícula 5x5</span>
+                <div id="custom-draw-grid" class="grid grid-cols-5 gap-1 bg-slate-950 p-2 rounded-xl border border-slate-700"></div>
+            </div>
+
+            <div class="flex gap-2">
+                <button onclick="clearCustomDrawGrid()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold py-2 px-3 rounded-lg text-[11px] transition">Limpiar</button>
+                <button onclick="saveCustomPattern()" class="flex-1 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold py-2 px-3 rounded-lg text-[11px] shadow-lg transition">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Win Modal Popup -->
+    <div id="win-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+        <div class="bg-slate-800 border border-emerald-500/50 rounded-2xl p-5 max-w-sm w-full shadow-2xl text-center relative overflow-hidden">
+            <div class="w-14 h-14 bg-gradient-to-tr from-emerald-500 to-teal-400 rounded-xl mx-auto flex items-center justify-center text-white text-2xl shadow-lg shadow-emerald-500/30 mb-3">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+            <h3 class="text-lg font-black text-white mb-1" id="win-title">¡BINGO CANTADO!</h3>
+            <p class="text-slate-300 text-xs mb-3" id="win-description">El cartón ha completado con éxito la figura.</p>
+            <div class="bg-slate-900/90 border border-emerald-500/30 rounded-xl p-3 mb-4 text-left shadow-inner">
+                <div class="text-[9px] text-emerald-400 font-bold mb-0.5 tracking-wider uppercase">DETALLES:</div>
+                <div id="win-details" class="text-white font-bold text-xs leading-relaxed">Cartón #1</div>
+            </div>
+            <button onclick="closeWinModal()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 px-4 rounded-xl text-xs shadow-lg transition">Continuar</button>
+        </div>
+    </div>
+
+    <!-- Script de Lógica del Juego -->
+    <script>
+        let selectedCardsIds = [];
+        let cardStates = {}; 
+        let masterMarkedNumbers = new Set();
+        let cardMarks = {}; 
+        let alreadyDeclaredWins = new Set();
+        let mobileSideBySideMode = false;
+
+        let gameModes = {
+            blackout: { name: "Cartón Lleno", desc: "Todas.", isCellInPattern: (r, c) => true, active: true, fixed: true },
+            diagonal: { 
+                name: "Diagonal (Ambos lados)", 
+                desc: "Cualquier diagonal completa.", 
+                isCellInPattern: (r, c) => (r === c) || (r + c === 4), 
+                active: true 
+            },
+            horizontal: { 
+                name: "Horizontal", 
+                desc: "Cualquier fila completa.", 
+                isCellInPattern: (r, c) => false, 
+                active: true 
+            },
+            vertical: { 
+                name: "Vertical", 
+                desc: "Cualquier columna completa.", 
+                isCellInPattern: (r, c) => false, 
+                active: true 
+            },
+            corners: { name: "4 Esquinas", desc: "Las esquinas.", isCellInPattern: (r, c) => (r === 0 && c === 0) || (r === 0 && c === 4) || (r === 4 && c === 0) || (r === 4 && c === 4), active: false },
+            cross: { name: "Cruz (+)", desc: "Centro.", isCellInPattern: (r, c) => r === 2 || c === 2, active: false }
+        };
+
+        let customDrawMatrix = Array(5).fill(0).map(() => Array(5).fill(false));
+
+        function getCardColorConfig(colorStr) {
+            let color = (colorStr || '').toString().toLowerCase().trim();
+            
+            if (color.includes('verde') || color.includes('emerald') || color.includes('green')) {
+                return {
+                    name: 'emerald',
+                    markedClass: 'bingo-cell-marked-emerald',
+                    borderModal: 'border-emerald-500/30 bg-emerald-950/20',
+                    textModal: 'text-emerald-300',
+                    badgeModal: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+                    btnChecked: 'bg-emerald-600 text-white border-emerald-400 shadow-sm ring-1 ring-emerald-400/50',
+                    btnUnchecked: 'bg-emerald-950/40 text-emerald-200 border-emerald-500/30',
+                    activeStyle: 'border: 2px solid #10b981; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);',
+                    activeTextClass: 'text-emerald-300',
+                    activeLetterClass: 'text-emerald-400',
+                    headerBorder: 'border-emerald-500/30',
+                    patternActiveBg: 'bg-emerald-500 shadow-sm shadow-emerald-500/50'
+                };
+            } 
+            else if (color.includes('morado') || color.includes('violeta') || color.includes('purple')) {
+                return {
+                    name: 'purple',
+                    markedClass: 'bingo-cell-marked-purple',
+                    borderModal: 'border-purple-500/30 bg-purple-950/20',
+                    textModal: 'text-purple-300',
+                    badgeModal: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+                    btnChecked: 'bg-purple-600 text-white border-purple-400 shadow-sm ring-1 ring-purple-400/50',
+                    btnUnchecked: 'bg-purple-950/40 text-purple-200 border-purple-500/30',
+                    activeStyle: 'border: 2px solid #a855f7; box-shadow: 0 4px 12px rgba(168, 85, 247, 0.15);',
+                    activeTextClass: 'text-purple-300',
+                    activeLetterClass: 'text-purple-400',
+                    headerBorder: 'border-purple-500/30',
+                    patternActiveBg: 'bg-purple-500 shadow-sm shadow-purple-500/50'
+                };
+            }
+            else if (color.includes('azul') || color.includes('blue')) {
+                return {
+                    name: 'blue',
+                    markedClass: 'bingo-cell-marked-blue',
+                    borderModal: 'border-blue-500/30 bg-blue-950/20',
+                    textModal: 'text-blue-300',
+                    badgeModal: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+                    btnChecked: 'bg-blue-600 text-white border-blue-400 shadow-sm ring-1 ring-blue-400/50',
+                    btnUnchecked: 'bg-blue-950/40 text-blue-200 border-blue-500/30',
+                    activeStyle: 'border: 2px solid #3b82f6; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);',
+                    activeTextClass: 'text-blue-300',
+                    activeLetterClass: 'text-blue-400',
+                    headerBorder: 'border-blue-500/30',
+                    patternActiveBg: 'bg-blue-500 shadow-sm shadow-blue-500/50'
+                };
+            }
+            else if (color.includes('roj') || color.includes('ros') || color.includes('pink') || color.includes('rose')) {
+                return {
+                    name: 'rose',
+                    markedClass: 'bingo-cell-marked-rose',
+                    borderModal: 'border-pink-500 bg-pink-950/40',
+                    textModal: 'text-pink-300 font-bold',
+                    badgeModal: 'bg-pink-500/20 text-pink-300 border-pink-500',
+                    btnChecked: 'bg-pink-600 text-white border-pink-400 shadow-sm ring-1 ring-pink-400/50',
+                    btnUnchecked: 'bg-pink-950/40 text-pink-200 border-pink-500/50',
+                    activeStyle: 'border: 2px solid #ec4899 !important; box-shadow: 0 4px 12px rgba(236, 72, 153, 0.2);',
+                    activeTextClass: 'text-pink-300',
+                    activeLetterClass: 'text-pink-400',
+                    headerBorder: 'border-pink-500/50',
+                    patternActiveBg: 'bg-pink-500 shadow-sm shadow-pink-500/50'
+                };
+            }
+            else {
+                return {
+                    name: 'indigo',
+                    markedClass: 'bingo-cell-marked-indigo',
+                    borderModal: 'border-indigo-500/30 bg-indigo-950/20',
+                    textModal: 'text-indigo-300',
+                    badgeModal: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+                    btnChecked: 'bg-indigo-600 text-white border-indigo-400 shadow-sm ring-1 ring-indigo-400/50',
+                    btnUnchecked: 'bg-indigo-950/40 text-indigo-200 border-indigo-500/30',
+                    activeStyle: 'border: 2px solid #6366f1; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);',
+                    activeTextClass: 'text-indigo-300',
+                    activeLetterClass: 'text-indigo-400',
+                    headerBorder: 'border-indigo-500/30',
+                    patternActiveBg: 'bg-indigo-500 shadow-sm shadow-indigo-500/50'
+                };
+            }
+        }
+
+        function toggleMobileLayout() {
+            mobileSideBySideMode = !mobileSideBySideMode;
+            const container = document.getElementById('main-container-layout');
+            const btnText = document.getElementById('layout-toggle-text');
+            const masterSection = document.getElementById('master-board-section');
+            const rightSection = document.getElementById('right-panel-section');
+
+            if (mobileSideBySideMode) {
+                container.classList.remove('flex', 'flex-col');
+                container.classList.add('grid', 'grid-cols-2');
+                masterSection.className = 'w-full col-span-1 flex flex-col gap-3';
+                rightSection.className = 'w-full col-span-1 flex flex-col gap-3';
+                btnText.textContent = 'Apilado';
+            } else {
+                container.classList.remove('grid', 'grid-cols-2');
+                container.classList.add('flex', 'flex-col', 'lg:grid', 'lg:grid-cols-12');
+                masterSection.className = 'w-full lg:col-span-5 flex flex-col gap-3';
+                rightSection.className = 'w-full lg:col-span-7 flex flex-col gap-3';
+                btnText.textContent = 'Lado a Lado';
+            }
+        }
+
+        function toggleModalitiesDropdown() {
+            const detailsBox = document.getElementById('modalities-details-box');
+            detailsBox.open = !detailsBox.open;
+        }
+
+        function guardarEstadoEnLocalStorage() {
+            try {
+                localStorage.setItem('bingo_selectedCardsIds', JSON.stringify(selectedCardsIds));
+                localStorage.setItem('bingo_cardStates', JSON.stringify(cardStates));
+                localStorage.setItem('bingo_masterMarkedNumbers', JSON.stringify(Array.from(masterMarkedNumbers)));
+                localStorage.setItem('bingo_cardMarks', JSON.stringify(cardMarks));
+                
+                let modesState = {};
+                for (let k in gameModes) {
+                    modesState[k] = {
+                        active: gameModes[k].active,
+                        name: gameModes[k].name,
+                        desc: gameModes[k].desc,
+                        fixed: gameModes[k].fixed || false,
+                        patternMatrix: gameModes[k].patternMatrix || null
+                    };
+                }
+                localStorage.setItem('bingo_gameModes', JSON.stringify(modesState));
+                return true;
+            } catch (e) {
+                console.error("Error guardando en localStorage:", e);
+                return false;
+            }
+        }
+
+        function cargarEstadoDesdeLocalStorage() {
+            try {
+                const savedSelected = localStorage.getItem('bingo_selectedCardsIds');
+                const savedStates = localStorage.getItem('bingo_cardStates');
+                const savedMaster = localStorage.getItem('bingo_masterMarkedNumbers');
+                const savedMarks = localStorage.getItem('bingo_cardMarks');
+                const savedModes = localStorage.getItem('bingo_gameModes');
+
+                if (savedSelected) selectedCardsIds = JSON.parse(savedSelected);
+                if (savedStates) cardStates = JSON.parse(savedStates);
+                if (savedMaster) masterMarkedNumbers = new Set(JSON.parse(savedMaster));
+                if (savedMarks) cardMarks = JSON.parse(savedMarks);
+                
+                if (savedModes) {
+                    let modesState = JSON.parse(savedModes);
+                    for (let k in modesState) {
+                        if (gameModes[k]) {
+                            gameModes[k].active = modesState[k].active;
+                        } else if (modesState[k].patternMatrix) {
+                            let pMatrix = modesState[k].patternMatrix;
+                            gameModes[k] = {
+                                name: modesState[k].name,
+                                desc: modesState[k].desc,
+                                active: modesState[k].active,
+                                fixed: false,
+                                patternMatrix: pMatrix,
+                                isCellInPattern: (r, c) => pMatrix[r] ? pMatrix[r][c] : false
+                            };
+                        }
+                    }
+                }
+                return true;
+            } catch (e) {
+                console.error("Error cargando desde localStorage:", e);
+                return false;
+            }
+        }
+
+        function getActiveThemeColor() {
+            let activeCards = selectedCardsIds.filter(id => cardStates[id] !== false);
+            if (activeCards.length === 0) return 'emerald';
+            let firstCard = allAvailableCards.find(c => c.id === activeCards[0]);
+            return firstCard ? firstCard.color : 'emerald';
+        }
+
+        function generateMiniDiagramHTML(patternCheckerOrMatrix) {
+            let themeColor = getActiveThemeColor();
+            let cfg = getCardColorConfig(themeColor);
+            let activeBgColorClass = cfg.patternActiveBg;
+
+            let html = `<div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; width: 36px; height: 36px;" class="bg-slate-950 p-1 rounded border border-slate-600 shadow-sm shrink-0">`;
+            
+            for (let r = 0; r < 5; r++) {
+                for (let c = 0; c < 5; c++) {
+                    let active = false;
+                    if (typeof patternCheckerOrMatrix === 'function') {
+                        active = patternCheckerOrMatrix(r, c);
+                    } else if (Array.isArray(patternCheckerOrMatrix)) {
+                        active = patternCheckerOrMatrix[r] && patternCheckerOrMatrix[r][c];
+                    }
+                    
+                    let cellStyle = active 
+                        ? `${activeBgColorClass} border border-white` 
+                        : 'bg-slate-800 border border-slate-700/60';
+                    html += `<div class="${cellStyle} rounded-[1px]"></div>`;
+                }
+            }
+            html += `</div>`;
+            return html;
+        }
+
+        function initModalitiesList() {
+            const container = document.getElementById('modalities-checkbox-container');
+            if (!container) return;
+            container.innerHTML = '';
+            
+            const themeColor = getActiveThemeColor();
+            const badge = document.getElementById('mode-theme-badge');
+            if (badge) {
+                badge.className = `text-[9px] px-2 py-0.5 rounded font-semibold bg-${themeColor}-500/20 text-${themeColor}-300 border border-${themeColor}-500/30`;
+                badge.textContent = `Tema ${themeColor.toUpperCase()}`;
+            }
+
+            for (let key in gameModes) {
+                let mode = gameModes[key];
+                let label = document.createElement('div');
+                label.className = "flex items-center justify-between p-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 cursor-pointer text-[11px] transition select-none shadow-sm gap-2";
+                
+                let diagramHTML = generateMiniDiagramHTML(mode.isCellInPattern);
+
+                let deleteButtonHtml = '';
+                if (!mode.fixed) {
+                    deleteButtonHtml = `
+                        <button onclick="deleteCustomModality('${key}')" class="text-rose-400 hover:text-rose-300 p-1 rounded transition" title="Eliminar modalidad definitivamente">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                    `;
+                }
+
+                label.innerHTML = `
+                    <div class="flex items-center gap-2.5 overflow-hidden flex-1">
+                        <input type="checkbox" value="${key}" ${mode.active ? 'checked' : ''} onchange="toggleModalityActive('${key}', this.checked)" class="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 bg-slate-950 border-slate-700 shrink-0">
+                        ${diagramHTML}
+                        <div class="truncate flex-1">
+                            <span class="font-bold text-slate-100 block text-xs truncate">${mode.name}</span>
+                            <span class="text-[9px] text-slate-400 block truncate">${mode.desc}</span>
+                        </div>
+                    </div>
+                    ${deleteButtonHtml}
+                `;
+                container.appendChild(label);
+            }
+            renderActiveModalitiesPreviewBar();
+        }
+
+        function deleteCustomModality(key) {
+            if (gameModes[key] && !gameModes[key].fixed) {
+                if (confirm(`¿Estás seguro de eliminar definitivamente la modalidad "${gameModes[key].name}"?`)) {
+                    delete gameModes[key];
+                    initModalitiesList();
+                    evaluateAllCardsForAutomaticWin();
+                    updateMasterBoardPendingHighlights();
+                    guardarEstadoEnLocalStorage();
+                }
+            }
+        }
+
+        function renderActiveModalitiesPreviewBar() {
+            const bar = document.getElementById('active-modalities-preview-bar');
+            if (!bar) return;
+            bar.innerHTML = '';
+            let activeKeys = Object.keys(gameModes).filter(k => gameModes[k].active);
+
+            if (activeKeys.length === 0) {
+                bar.innerHTML = '<span class="text-[10px] text-slate-500 italic">Ninguna modalidad activa...</span>';
+                return;
+            }
+
+            activeKeys.forEach(key => {
+                let mode = gameModes[key];
+                let diagramHTML = generateMiniDiagramHTML(mode.isCellInPattern);
+                let pill = document.createElement('div');
+                pill.className = "flex items-center gap-2 bg-slate-950 border border-slate-700 px-2.5 py-1.5 rounded-xl text-[11px] shadow-sm whitespace-nowrap shrink-0";
+                pill.innerHTML = `${diagramHTML}<span class="font-bold text-white text-xs">${mode.name}</span>`;
+                bar.appendChild(pill);
+            });
+        }
+
+        function toggleModalityActive(key, status) {
+            if (gameModes[key]) gameModes[key].active = status;
+            renderActiveModalitiesPreviewBar();
+            selectedCardsIds.forEach(id => {
+                if (cardStates[id] !== false) evaluateAllCardsForAutomaticWin();
+            });
+            updateMasterBoardPendingHighlights();
+            guardarEstadoEnLocalStorage();
+        }
+
+        function initCustomDrawGrid() {
+            const container = document.getElementById('custom-draw-grid');
+            if (!container) return;
+            container.innerHTML = '';
+            for (let r = 0; r < 5; r++) {
+                for (let c = 0; c < 5; c++) {
+                    let btn = document.createElement('button');
+                    btn.type = "button";
+                    let active = customDrawMatrix[r][c];
+                    let themeColor = getActiveThemeColor();
+                    let cfg = getCardColorConfig(themeColor);
+                    btn.className = `w-7 h-7 rounded transition-all border ${active ? `${cfg.patternActiveBg} border-white` : 'bg-slate-900 border-slate-700 hover:border-slate-500'}`;
+                    btn.onclick = () => {
+                        customDrawMatrix[r][c] = !customDrawMatrix[r][c];
+                        initCustomDrawGrid();
+                    };
+                    container.appendChild(btn);
+                }
+            }
+        }
+
+        function clearCustomDrawGrid() {
+            customDrawMatrix = Array(5).fill(0).map(() => Array(5).fill(false));
+            initCustomDrawGrid();
+        }
+
+        function openCustomPatternModal() {
+            document.getElementById('custom-pattern-name').value = '';
+            clearCustomDrawGrid();
+            document.getElementById('custom-pattern-modal').classList.remove('hidden');
+        }
+
+        function closeCustomPatternModal() {
+            document.getElementById('custom-pattern-modal').classList.add('hidden');
+        }
+
+        function saveCustomPattern() {
+            let nameInput = document.getElementById('custom-pattern-name').value.trim();
+            if (!nameInput) { alert("Ingresa un nombre."); return; }
+            let hasActive = customDrawMatrix.some(row => row.some(val => val));
+            if (!hasActive) { alert("Selecciona al menos una casilla."); return; }
+
+            let modeKey = 'custom_' + Date.now();
+            let matrixCopy = JSON.parse(JSON.stringify(customDrawMatrix));
+
+            gameModes[modeKey] = {
+                name: nameInput,
+                desc: `Personalizado.`,
+                active: true,
+                fixed: false,
+                patternMatrix: matrixCopy,
+                isCellInPattern: (r, c) => matrixCopy[r] ? matrixCopy[r][c] : false
+            };
+
+            closeCustomPatternModal();
+            initModalitiesList();
+            evaluateAllCardsForAutomaticWin();
+            updateMasterBoardPendingHighlights();
+            guardarEstadoEnLocalStorage();
+        }
+
+        // ==========================================
+        // NUEVA FUNCIÓN: Seleccionar / Deseleccionar un grupo de color completo
+        // ==========================================
+        function toggleGroupSelection(groupKey) {
+            // Buscamos los cartones que pertenecen a este grupo
+            const groupCards = window.allAvailableCards.filter(card => `${card.color}_${card.batch}` === groupKey);
+            if (groupCards.length === 0) return;
+
+            // Verificamos si todos los cartones de este grupo ya están seleccionados
+            const allSelected = groupCards.every(card => selectedCardsIds.includes(card.id));
+
+            if (allSelected) {
+                // Si ya estaban todos, los removemos de la selección
+                const groupCardIds = groupCards.map(c => c.id);
+                selectedCardsIds = selectedCardsIds.filter(id => !groupCardIds.includes(id));
+            } else {
+                // Si faltaba alguno, los agregamos todos sin duplicar
+                groupCards.forEach(card => {
+                    if (!selectedCardsIds.includes(card.id)) {
+                        selectedCardsIds.push(card.id);
+                    }
+                });
+            }
+
+            // Refrescamos la vista del modal conservando el filtro de búsqueda actual
+            buildCardSelectorModalList(document.getElementById('card-search-input').value);
+        }
+
+function buildCardSelectorModalList(filterText = "") {
+            const container = document.getElementById('selector-cards-list');
+            if (!container) return;
+
+            // 1. GUARDAR cuáles grupos (gKey) estaban abiertos actualmente antes de limpiar
+            const openGroupsState = {};
+            container.querySelectorAll('details').forEach(det => {
+                const gKey = det.getAttribute('data-group-key');
+                if (gKey) {
+                    openGroupsState[gKey] = det.open;
+                }
+            });
+
+            container.innerHTML = '';
+
+            const groups = {};
+            
+            allAvailableCards.forEach(card => {
+                if (filterText && !card.title.toLowerCase().includes(filterText.toLowerCase()) && !card.batch.toLowerCase().includes(filterText.toLowerCase())) {
+                    return;
+                }
+                let groupKey = `${card.color}_${card.batch}`;
+                if (!groups[groupKey]) {
+                    groups[groupKey] = { color: card.color, batchName: card.batch, cards: [] };
+                }
+                groups[groupKey].cards.push(card);
+            });
+
+            for (let gKey in groups) {
+                let group = groups[gKey];
+                let cfg = getCardColorConfig(group.color);
+                
+                let allGroupSelected = group.cards.every(card => selectedCardsIds.includes(card.id));
+
+                let details = document.createElement('details');
+                details.className = `border rounded-xl overflow-hidden ${cfg.borderModal} transition mb-2 shadow-sm`;
+                
+                // 2. RESTAURAR el estado abierto: si se estaba buscando texto, o si el usuario lo tenía abierto previamente
+                details.setAttribute('data-group-key', gKey);
+                details.open = (filterText.length > 0) || (openGroupsState[gKey] === true);
+                
+                let summary = document.createElement('summary');
+                summary.className = `p-2.5 bg-slate-900/90 hover:bg-slate-900 cursor-pointer flex justify-between items-center transition select-none list-none font-bold text-xs ${cfg.textModal}`;
+                summary.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-layer-group text-xs"></i>
+                        <span class="text-xs">${group.batchName}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <!-- BOTÓN: Seleccionar Todos del Grupo -->
+                        <button type="button" onclick="event.stopPropagation(); toggleGroupSelection('${gKey}')" class="text-[9px] bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 px-2 py-0.5 rounded font-semibold transition">
+                            ${allGroupSelected ? 'Quitar todos' : 'Seleccionar todos'}
+                        </button>
+                        <span class="text-[9px] px-2 py-0.5 rounded-full border font-semibold ${cfg.badgeModal}">${group.cards.length} cartones</span>
+                        <i class="fa-solid fa-chevron-down text-slate-400 text-[10px]"></i>
+                    </div>
+                `;
+
+                let contentDiv = document.createElement('div');
+                contentDiv.className = "p-2 border-t border-slate-700/60 bg-slate-950/70 grid grid-cols-3 sm:grid-cols-6 gap-2 max-h-48 overflow-y-auto";
+
+                group.cards.forEach(card => {
+                    let isChecked = selectedCardsIds.includes(card.id);
+                    let cardDiv = document.createElement('div');
+                    
+                    cardDiv.className = `flex flex-col items-center justify-center p-2 rounded-lg border cursor-pointer transition-all select-none text-center ${isChecked ? cfg.btnChecked : cfg.btnUnchecked}`;
+                    
+                    let numeroCorto = card.title.replace(/Cartón\s*(Azul|Verde|Morado|Violeta|Rosado|Rosa|Magenta)?\s*#?/gi, '').trim();
+                    if (!numeroCorto) numeroCorto = card.id;
+
+                    cardDiv.innerHTML = `
+                        <span class="text-[8px] opacity-75 font-semibold uppercase">Cartón</span>
+                        <span class="text-xs font-black">#${numeroCorto}</span>
+                    `;
+
+                    cardDiv.onclick = function() {
+                        let id = card.id;
+                        let index = selectedCardsIds.indexOf(id);
+                        if (index > -1) {
+                            selectedCardsIds.splice(index, 1);
+                        } else {
+                            selectedCardsIds.push(id);
+                        }
+                        buildCardSelectorModalList(document.getElementById('card-search-input').value);
+                    };
+
+                    contentDiv.appendChild(cardDiv);
+                });
+
+                details.appendChild(summary);
+                details.appendChild(contentDiv);
+                container.appendChild(details);
+            }
+        }
+        function filterCardSelector() {
+            let query = document.getElementById('card-search-input').value;
+            buildCardSelectorModalList(query);
+        }
+
+        function openCardSelectorModal() {
+            document.getElementById('card-search-input').value = '';
+            buildCardSelectorModalList();
+            document.getElementById('card-selector-modal').classList.remove('hidden');
+        }
+
+        function closeCardSelectorModal() {
+            document.getElementById('card-selector-modal').classList.add('hidden');
+        }
+
+        function selectAllCards(select) {
+            if (select) {
+                selectedCardsIds = allAvailableCards.map(c => c.id);
+            } else {
+                selectedCardsIds = [];
+            }
+            buildCardSelectorModalList(document.getElementById('card-search-input').value);
+        }
+
+        function applyCardSelection() {
+            if (selectedCardsIds.length === 0) {
+                alert("Selecciona al menos un cartón.");
+                return;
+            }
+
+            selectedCardsIds.forEach(id => {
+                if (cardStates[id] === undefined) cardStates[id] = true; 
+            });
+
+            selectedCardsIds.forEach(id => {
+                if (!cardMarks[id]) cardMarks[id] = { "2-2": true };
+                
+                let card = allAvailableCards.find(c => c.id === id);
+                if (card) {
+                    for (let r = 0; r < 5; r++) {
+                        for (let c = 0; c < 5; c++) {
+                            let val = card.numbers[r][c];
+                            if (masterMarkedNumbers.has(val)) {
+                                cardMarks[id][`${r}-${c}`] = true;
+                            }
+                        }
+                    }
+                }
+            });
+
+            closeCardSelectorModal();
+            initActiveCards();
+            initModalitiesList();
+            updateMasterBoardPendingHighlights();
+            guardarEstadoEnLocalStorage();
+
+            setTimeout(() => {
+                initActiveCards();
+                renderPlayerCards();
+            }, 50);
+        }
+
+        function toggleCardActiveState(cardId) {
+            cardStates[cardId] = !cardStates[cardId];
+            initActiveCards();
+            initModalitiesList();
+            updateMasterBoardPendingHighlights();
+            guardarEstadoEnLocalStorage();
+        }
+
+        function removeCardCompletely(cardId) {
+            selectedCardsIds = selectedCardsIds.filter(id => id !== cardId);
+            delete cardStates[cardId];
+            delete cardMarks[cardId];
+            initActiveCards();
+            initModalitiesList();
+            updateMasterBoardPendingHighlights();
+            guardarEstadoEnLocalStorage();
+        }
+
+        function removeAllActiveCards() {
+            if (selectedCardsIds.length === 0) return;
+            if (confirm("¿Estás seguro de eliminar todos los cartones activos de la mesa?")) {
+                selectedCardsIds = [];
+                cardStates = {};
+                cardMarks = {};
+                alreadyDeclaredWins.clear();
+                initActiveCards();
+                initModalitiesList();
+                updateMasterBoardPendingHighlights();
+                guardarEstadoEnLocalStorage();
+            }
+        }
+
+        function initActiveCards() {
+            const container = document.getElementById('active-cards-container');
+            if (!container) return;
+            container.innerHTML = '';
+            
+            let activeCount = selectedCardsIds.filter(id => cardStates[id] !== false).length;
+            let subtitleEl = document.getElementById('active-cards-subtitle');
+            if (subtitleEl) subtitleEl.textContent = `${activeCount} cartones en mesa`;
+
+            if (selectedCardsIds.length === 0) {
+                container.innerHTML = `
+                    <div class="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl p-3 text-center text-slate-400 text-[11px] col-span-1 sm:col-span-2">
+                        <i class="fa-solid fa-ticket text-sm mb-1 text-indigo-400"></i>
+                        <p>No hay cartones seleccionados. Haz clic en <strong>"Cartones"</strong>.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            selectedCardsIds.forEach(id => {
+                let card = allAvailableCards.find(c => c.id === id);
+                if (!card) return;
+
+                let isActive = cardStates[id] !== false;
+                if (!cardMarks[card.id]) cardMarks[card.id] = { "2-2": true };
+
+                let cfg = getCardColorConfig(card.color);
+                const cardWrapper = document.createElement('div');
+                cardWrapper.className = `bg-slate-900 rounded-xl p-2 shadow-md flex flex-col transition-all ${!isActive ? 'opacity-50 grayscale-[30%]' : ''}`;
+                cardWrapper.setAttribute('style', cfg.activeStyle);
+               
+                let headerHTML = `
+                    <div class="flex justify-between items-center mb-1.5 pb-1 border-b ${cfg.headerBorder}">
+                        <span class="font-bold text-[11px] ${cfg.activeTextClass} flex items-center gap-1 truncate max-w-[130px]">
+                            <i class="fa-solid fa-ticket text-[10px]"></i> ${card.title}
+                        </span>
+                        <div class="flex items-center gap-1">
+                            <button onclick="toggleCardActiveState(${card.id})" class="text-[8px] ${isActive ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'} px-1 py-0.2 rounded font-semibold">
+                                ${isActive ? 'Ocultar' : 'Ver'}
+                            </button>
+                            <button onclick="removeCardCompletely(${card.id})" class="text-[8px] bg-rose-500/20 text-rose-300 px-1 py-0.2 rounded">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                let gridHTML = `<div class="grid grid-cols-5 gap-0.5 text-center font-black text-[10px] mb-0.5 ${cfg.activeLetterClass}">
+                    <div>B</div><div>I</div><div>N</div><div>G</div><div>O</div>
+                </div>`;
+
+                gridHTML += `<div class="grid grid-cols-5 gap-0.5" id="card-grid-${card.id}">`;
+                for (let r = 0; r < 5; r++) {
+                    for (let col = 0; col < 5; col++) {
+                        let val = card.numbers[r][col];
+                        let isFree = val === "FREE";
+                        let cellKey = `${r}-${col}`;
+                        let marked = isFree ? true : (cardMarks[card.id] && cardMarks[card.id][cellKey]);
+                        
+                        let markedClassApplied = marked ? cfg.markedClass : 'bg-slate-800 text-slate-200 border-slate-700 active:bg-slate-700';
+
+                        gridHTML += `
+                            <button onclick="toggleCellMark(${card.id}, ${r}, ${col}, '${val}')" 
+                                id="cell-${card.id}-${r}-${col}"
+                                class="h-7 sm:h-8 rounded text-[11px] sm:text-xs font-bold flex items-center justify-center transition-all border ${
+                                    isFree ? 'bg-indigo-600 text-white border-indigo-500 text-[8px]' : markedClassApplied
+                                }">
+                                ${isFree ? 'FREE' : val}
+                            </button>
+                        `;
+                    }
+                }
+                gridHTML += `</div>`;
+
+                cardWrapper.innerHTML = headerHTML + gridHTML;
+                container.appendChild(cardWrapper);
+            });
+            
+            renderPlayerCards();
+            initModalitiesList();
+        }
+
+        function renderPlayerCards() {
+            selectedCardsIds.forEach(id => {
+                if (cardStates[id] === false) return; 
+                let card = allAvailableCards.find(c => c.id === id);
+                if (!card) return;
+                let cfg = getCardColorConfig(card.color);
+
+                for (let r = 0; r < 5; r++) {
+                    for (let col = 0; col < 5; col++) {
+                        let val = card.numbers[r][col];
+                        if (val === "FREE") continue;
+                        let cellKey = `${r}-${col}`;
+                        let isMarked = cardMarks[card.id] && cardMarks[card.id][cellKey];
+                        let btn = document.getElementById(`cell-${card.id}-${r}-${col}`);
+                        if (btn) {
+                            if (isMarked) {
+                                btn.classList.add(cfg.markedClass);
+                                btn.classList.remove('bg-slate-800', 'text-slate-200', 'border-slate-700');
+                            } else {
+                                btn.classList.remove(cfg.markedClass, 'bingo-cell-marked-emerald', 'bingo-cell-marked-purple', 'bingo-cell-marked-blue', 'bingo-cell-marked-rose', 'bingo-cell-marked-indigo');
+                                btn.classList.add('bg-slate-800', 'text-slate-200', 'border-slate-700');
+                            }
+                        }
+                    }
+                }
+            });
+            updateMasterBoardPendingHighlights();
+        }
+
+        function renderMasterBoard() {
+            const container = document.getElementById('master-board-columns');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            const letters = ['B', 'I', 'N', 'G', 'O'];
+            
+            for (let col = 0; col < 5; col++) {
+                const colDiv = document.createElement('div');
+                colDiv.className = 'flex flex-col gap-0.5';
+                
+                const headerDiv = document.createElement('div');
+                headerDiv.className = 'bg-indigo-600 text-white font-bold text-center text-[10px] py-0.5 rounded shadow-xs';
+                headerDiv.textContent = letters[col];
+                colDiv.appendChild(headerDiv);
+                
+                for (let row = 1; row <= 15; row++) {
+                    const num = col * 15 + row;
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.id = `master-num-${num}`;
+                    
+                    const isDrawn = masterMarkedNumbers.has(num);
+                    
+                    btn.className = `h-4 sm:h-5 flex items-center justify-center text-[9px] sm:text-[10px] font-bold rounded transition border ${
+                        isDrawn
+                            ? 'master-cell-marked'
+                            : 'bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-white'
+                    }`;
+                    btn.textContent = num;
+                    btn.onclick = () => toggleMasterNumber(num);
+                    colDiv.appendChild(btn);
+                }
+                container.appendChild(colDiv);
+            }
+            updateMasterBoardDisplay();
+        }
+
+        function toggleMasterNumber(num) {
+            if (masterMarkedNumbers.has(num)) {
+                masterMarkedNumbers.delete(num);
+                if (document.getElementById('auto-mark-toggle').checked) autoUnmarkNumberOnCards(num);
+            } else {
+                masterMarkedNumbers.add(num);
+                playSound('marcar');
+                if (document.getElementById('auto-mark-toggle').checked) autoMarkNumberOnCards(num);
+            }
+            updateMasterBoardDisplay();
+            updateDrawnCountBadge();
+            updateRecentBallsHistory();
+            evaluateAllCardsForAutomaticWin();
+            guardarEstadoEnLocalStorage();
+        }
+
+        function updateRecentBallsHistory() {
+            const container = document.getElementById('recent-balls-history');
+            if (!container) return;
+            
+            let arr = Array.from(masterMarkedNumbers);
+            let ultimas = arr.slice(-6).reverse();
+
+            if (ultimas.length === 0) {
+                container.innerHTML = `<span class="text-[10px] text-slate-500 italic">Ninguna bola aún</span>`;
+                return;
+            }
+
+            container.innerHTML = '';
+            ultimas.forEach((num, index) => {
+                let letra = 'B';
+                if (num > 15 && num <= 30) letra = 'I';
+                else if (num > 30 && num <= 45) letra = 'N';
+                else if (num > 45 && num <= 60) letra = 'G';
+                else if (num > 60) letra = 'O';
+
+                let span = document.createElement('span');
+                let clasesEstilo = index === 0 
+                    ? "bg-indigo-600 text-white font-black border border-indigo-400 shadow-sm scale-105" 
+                    : "bg-slate-800 text-slate-300 border border-slate-700 font-bold";
+
+                span.className = `text-[10px] px-2 py-0.5 rounded-lg flex items-center gap-0.5 transition-all ${clasesEstilo}`;
+                span.innerHTML = `<span class="text-[8px] opacity-75">${letra}</span><span>${num}</span>`;
+                container.appendChild(span);
+            });
+        }
+
+        function updateMasterBoardDisplay() {
+            for (let num = 1; num <= 75; num++) {
+                let btn = document.getElementById(`master-num-${num}`);
+                if (!btn) continue;
+                btn.classList.remove('master-cell-marked', 'master-cell-titilar', 'master-cell-pending-emerald', 'master-cell-pending-purple', 'master-cell-pending-blue', 'master-cell-pending-rose', 'master-cell-pending-indigo', 'bg-slate-950', 'border-slate-800', 'text-slate-400');
+                
+                if (masterMarkedNumbers.has(num)) {
+                    btn.classList.add('master-cell-marked');
+                } else {
+                    btn.classList.add('bg-slate-950', 'border-slate-800', 'text-slate-400');
+                }
+            }
+            applyPendingHighlightsToMasterBoard();
+        }
+
+        function updateMasterBoardPendingHighlights() { updateMasterBoardDisplay(); }
+
+        function getMissingNumbersForCardAndMode(cardId, modeKey, modeData) {
+            let card = allAvailableCards.find(c => c.id === cardId);
+            if (!card) return [];
+            let missingCells = [];
+
+            let resultado = checkSingleModeWinWithIndices(cardId, modeKey, modeData);
+            if (resultado.esGanador) return [];
+
+            if (modeKey === 'horizontal') {
+                for (let r = 0; r < 5; r++) {
+                    let rowCellsUnmarked = [];
+                    for (let c = 0; c < 5; c++) {
+                        let val = card.numbers[r][c];
+                        if (val !== "FREE" && !isCellMarked(cardId, r, c)) {
+                            rowCellsUnmarked.push(val);
+                        }
+                    }
+                    if (rowCellsUnmarked.length === 1) {
+                        missingCells.push(rowCellsUnmarked[0]);
+                    }
+                }
+            } else if (modeKey === 'vertical') {
+                for (let c = 0; c < 5; c++) {
+                    let colCellsUnmarked = [];
+                    for (let r = 0; r < 5; r++) {
+                        let val = card.numbers[r][c];
+                        if (val !== "FREE" && !isCellMarked(cardId, r, c)) {
+                            colCellsUnmarked.push(val);
+                        }
+                    }
+                    if (colCellsUnmarked.length === 1) {
+                        missingCells.push(colCellsUnmarked[0]);
+                    }
+                }
+            } else if (modeKey === 'diagonal') {
+                let diag1Unmarked = [];
+                for (let i = 0; i < 5; i++) {
+                    let val = card.numbers[i][i];
+                    if (val !== "FREE" && !isCellMarked(cardId, i, i)) {
+                        diag1Unmarked.push(val);
+                    }
+                }
+                if (diag1Unmarked.length === 1) missingCells.push(diag1Unmarked[0]);
+
+                let diag2Unmarked = [];
+                for (let i = 0; i < 5; i++) {
+                    let val = card.numbers[i][4 - i];
+                    if (val !== "FREE" && !isCellMarked(cardId, i, 4 - i)) {
+                        diag2Unmarked.push(val);
+                    }
+                }
+                if (diag2Unmarked.length === 1) missingCells.push(diag2Unmarked[0]);
+            } else {
+                let patternUnmarkedNumbers = [];
+                let unmarkedCount = 0;
+                for (let r = 0; r < 5; r++) {
+                    for (let c = 0; c < 5; c++) {
+                        let enPatron = false;
+                        if (typeof modeData.isCellInPattern === 'function') {
+                            enPatron = modeData.isCellInPattern(r, c);
+                        }
+                        if (enPatron) {
+                            let val = card.numbers[r][c];
+                            if (val !== "FREE" && !isCellMarked(cardId, r, c)) {
+                                unmarkedCount++;
+                                patternUnmarkedNumbers.push(val);
+                            }
+                        }
+                    }
+                }
+                if (unmarkedCount === 1) {
+                    missingCells.push(patternUnmarkedNumbers[0]);
+                }
+            }
+
+            return missingCells;
+        }
+
+        function applyPendingHighlightsToMasterBoard() {
+            let numbersToHighlight = new Set();
+            let nearWinsList = [];
+
+            selectedCardsIds.forEach(cardId => {
+                if (cardStates[cardId] === false) return; 
+                let card = allAvailableCards.find(c => c.id === cardId);
+                if (!card) return;
+
+                for (let modeKey in gameModes) {
+                    let mode = gameModes[modeKey];
+                    if (!mode.active) continue;
+                    
+                    let resultadoWin = checkSingleModeWinWithIndices(cardId, modeKey, mode);
+                    if (resultadoWin.esGanador) continue;
+
+                    let missingNums = getMissingNumbersForCardAndMode(cardId, modeKey, mode);
+                    
+                    missingNums.forEach(num => { 
+                        if (!masterMarkedNumbers.has(num)) {
+                            numbersToHighlight.add(num);
+                            nearWinsList.push({
+                                cardTitle: card.title,
+                                modeName: mode.name,
+                                ficha: num
+                            });
+                        }
+                    });
+                }
+            });
+
+            numbersToHighlight.forEach(num => {
+                let btn = document.getElementById(`master-num-${num}`);
+                if (btn && !masterMarkedNumbers.has(num)) {
+                    btn.classList.remove('bg-slate-950', 'border-slate-800', 'text-slate-400');
+                    btn.classList.add('master-cell-titilar');
+                }
+            });
+
+            updateNearWinPanel(nearWinsList);
+        }
+
+        function updateNearWinPanel(list) {
+            const container = document.getElementById('near-win-cards-container');
+            const badge = document.getElementById('near-win-count-badge');
+            if (!container || !badge) return;
+
+            badge.textContent = `${list.length} a pique`;
+
+            if (list.length === 0) {
+                container.innerHTML = `<div class="text-[10px] text-slate-400 text-center py-2 italic">Ningún cartón a pique por ahora...</div>`;
+                return;
+            }
+
+            container.innerHTML = '';
+            list.forEach(item => {
+                let row = document.createElement('div');
+                row.className = "flex items-center justify-between bg-slate-900 border border-amber-500/30 rounded-lg p-1.5 text-[10px]";
+                row.innerHTML = `
+                    <div class="flex items-center gap-1.5">
+                        <i class="fa-solid fa-star text-amber-400"></i>
+                        <span class="font-bold text-white">${item.cardTitle}</span>
+                        <span class="text-slate-400">(${item.modeName})</span>
+                    </div>
+                    <span class="bg-amber-500/20 text-amber-300 font-black px-2 py-0.5 rounded border border-amber-500/40">Ficha: ${item.ficha}</span>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        function updateDrawnCountBadge() {
+            const badge = document.getElementById('drawn-count-badge');
+            if (badge) badge.textContent = `${masterMarkedNumbers.size} cantados`;
+        }
+
+        function autoMarkNumberOnCards(num) {
+            selectedCardsIds.forEach(id => {
+                if (cardStates[id] === false) return;
+                let card = allAvailableCards.find(c => c.id === id);
+                if (!card) return;
+                for (let r = 0; r < 5; r++) {
+                    for (let col = 0; col < 5; col++) {
+                        if (card.numbers[r][col] === num) {
+                            if (!cardMarks[card.id]) cardMarks[card.id] = {};
+                            cardMarks[card.id][`${r}-${col}`] = true;
+                        }
+                    }
+                }
+            });
+            renderPlayerCards();
+        }
+
+        function autoUnmarkNumberOnCards(num) {
+            selectedCardsIds.forEach(id => {
+                if (cardStates[id] === false) return;
+                let card = allAvailableCards.find(c => c.id === id);
+                if (!card) return;
+                for (let r = 0; r < 5; r++) {
+                    for (let col = 0; col < 5; col++) {
+                        if (card.numbers[r][col] === num) {
+                            if (cardMarks[card.id]) cardMarks[card.id][`${r}-${col}`] = false;
+                        }
+                    }
+                }
+            });
+            renderPlayerCards();
+        }
+
+        function toggleCellMark(cardId, r, col, val) {
+            if (val === "FREE" || cardStates[cardId] === false) return;
+            if (!cardMarks[cardId]) cardMarks[cardId] = {};
+            cardMarks[cardId][`${r}-${col}`] = !cardMarks[cardId][`${r}-${col}`];
+            renderPlayerCards();
+            evaluateAllCardsForAutomaticWin();
+            guardarEstadoEnLocalStorage();
+        }
+
+        function isCellMarked(cardId, r, col) {
+            let card = allAvailableCards.find(c => c.id === cardId);
+            if (card && card.numbers[r][col] === "FREE") return true;
+            return cardMarks[cardId] && cardMarks[cardId][`${r}-${col}`];
+        }
+
+        function checkSingleModeWinWithIndices(cardId, modeKey, modeData) {
+            let card = allAvailableCards.find(c => c.id === cardId);
+            if (!card) return { esGanador: false, indices: [] };
+
+            let indicesGanadores = [];
+
+            if (modeKey === 'horizontal') {
+                for (let r = 0; r < 5; r++) {
+                    let lineaCompleta = true;
+                    let tempFila = [];
+                    for (let c = 0; c < 5; c++) {
+                        if (!isCellMarked(cardId, r, c)) { lineaCompleta = false; break; }
+                        tempFila.push({ row: r, col: c });
+                    }
+                    if (lineaCompleta) return { esGanador: true, indices: tempFila };
+                }
+            } 
+            else if (modeKey === 'vertical') {
+                for (let c = 0; c < 5; c++) {
+                    let colCompleta = true;
+                    let tempCol = [];
+                    for (let r = 0; r < 5; r++) {
+                        if (!isCellMarked(cardId, r, c)) { colCompleta = false; break; }
+                        tempCol.push({ row: r, col: c });
+                    }
+                    if (colCompleta) return { esGanador: true, indices: tempCol };
+                }
+            }
+            else if (modeKey === 'diagonal') {
+                let diag1Completa = true, tempDiag1 = [];
+                let diag2Completa = true, tempDiag2 = [];
+                for (let i = 0; i < 5; i++) {
+                    if (!isCellMarked(cardId, i, i)) diag1Completa = false;
+                    tempDiag1.push({ row: i, col: i });
+                    if (!isCellMarked(cardId, i, 4 - i)) diag2Completa = false;
+                    tempDiag2.push({ row: i, col: 4 - i });
+                }
+                if (diag1Completa) return { esGanador: true, indices: tempDiag1 };
+                if (diag2Completa) return { esGanador: true, indices: tempDiag2 };
+            }
+            else {
+                let cumple = true;
+                for (let r = 0; r < 5; r++) {
+                    for (let c = 0; c < 5; c++) {
+                        let enPatron = false;
+                        if (typeof modeData.isCellInPattern === 'function') {
+                            enPatron = modeData.isCellInPattern(r, c);
+                        }
+                        
+                        if (enPatron) {
+                            if (!isCellMarked(cardId, r, c)) {
+                                cumple = false;
+                                break;
+                            } else {
+                                indicesGanadores.push({ row: r, col: c });
+                            }
+                        }
+                    }
+                    if (!cumple) break;
+                }
+                if (cumple && indicesGanadores.length > 0) {
+                    return { esGanador: true, indices: indicesGanadores };
+                }
+            }
+
+            return { esGanador: false, indices: [] };
+        }
+
+        function getCompletedModalitiesWithDetails(cardId) {
+            let matchDetails = [];
+            for (let key in gameModes) {
+                let mode = gameModes[key];
+                if (mode.active) {
+                    let resultado = checkSingleModeWinWithIndices(cardId, key, mode);
+                    if (resultado.esGanador) {
+                        matchDetails.push({
+                            modalidadNombre: mode.name,
+                            indicesGanadores: resultado.indices
+                        });
+                    }
+                }
+            }
+            return matchDetails;
+        }
+
+        function evaluateAllCardsForAutomaticWin() {
+            let currentWinsThisTurn = new Set();
+            let listaGanadoresGlobales = [];
+
+            selectedCardsIds.forEach(cardId => {
+                if (cardStates[cardId] === false) return;
+                let card = allAvailableCards.find(c => c.id === cardId);
+                if (!card) return;
+
+                let modalidadesCumplidas = getCompletedModalitiesWithDetails(cardId);
+                modalidadesCumplidas.forEach(match => {
+                    let winSignature = `${cardId}-${match.modalidadNombre}`;
+                    currentWinsThisTurn.add(winSignature);
+
+                    if (!alreadyDeclaredWins.has(winSignature)) {
+                        alreadyDeclaredWins.add(winSignature);
+                        listaGanadoresGlobales.push({
+                            card: card,
+                            modalidad: match.modalidadNombre,
+                            indicesGanadores: match.indices
+                        });
+                    }
+                });
+            });
+
+            if (listaGanadoresGlobales.length > 0) {
+                mostrarModalGanadoresMultiples(listaGanadoresGlobales);
+            }
+
+            for (let winSig of alreadyDeclaredWins) {
+                if (!currentWinsThisTurn.has(winSig)) alreadyDeclaredWins.delete(winSig);
+            }
+        }
+
+        function mostrarModalGanadoresMultiples(listaGanadores) {
+            let ganadoresAgrupados = {};
+
+            listaGanadores.forEach(item => {
+                let cardId = item.card.id;
+                if (!ganadoresAgrupados[cardId]) {
+                    ganadoresAgrupados[cardId] = {
+                        card: item.card,
+                        modalidades: [],
+                        indicesGanadores: []
+                    };
+                }
+                
+                if (item.modalidad && !ganadoresAgrupados[cardId].modalidades.includes(item.modalidad)) {
+                    ganadoresAgrupados[cardId].modalidades.push(item.modalidad);
+                }
+
+                if (item.indicesGanadores && Array.isArray(item.indicesGanadores)) {
+                    item.indicesGanadores.forEach(nuevoIdx => {
+                        let yaExiste = ganadoresAgrupados[cardId].indicesGanadores.some(
+                            e => e.row === nuevoIdx.row && e.col === nuevoIdx.col
+                        );
+                        if (!yaExiste) {
+                            ganadoresAgrupados[cardId].indicesGanadores.push(nuevoIdx);
+                        }
+                    });
+                }
+            });
+
+            let htmlDetalles = `<div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; max-height: 60vh; overflow-y: auto; padding: 10px;">`;
+            let resumenTextos = [];
+
+            Object.values(ganadoresAgrupados).forEach(item => {
+                let card = item.card;
+                let modsStr = item.modalidades.length > 0 ? item.modalidades.join(', ') : 'Bingo';
+                resumenTextos.push(`Cartón <strong>${card.title}</strong> (${modsStr})`);
+
+                let diagramasModalesHTML = '';
+                item.modalidades.forEach(modName => {
+                    for (let key in gameModes) {
+                        if (gameModes[key].name === modName) {
+                            diagramasModalesHTML += generateMiniDiagramHTML(gameModes[key].isCellInPattern);
+                            break;
+                        }
+                    }
+                });
+
+                htmlDetalles += `
+                    <div style="background: rgba(15, 23, 42, 0.9); border: 2px solid #f59e0b; border-radius: 12px; padding: 12px; text-align: center; max-width: 220px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px;">
+                            ${diagramasModalesHTML}
+                            <div style="text-align: left;">
+                                <h4 style="color: #fef08a; font-size: 13px; margin: 0; font-weight: bold;">
+                                    ${card.title}
+                                </h4>
+                                <span style="font-size: 10px; color: #cbd5e1; display: block;">[ ${modsStr} ]</span>
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px;">
+                `;
+                
+                for (let r = 0; r < 5; r++) {
+                    for (let c = 0; c < 5; c++) {
+                        let val = card.numbers[r][c];
+                        let esLibre = (val === "FREE");
+                        let esGanadora = item.indicesGanadores.some(idx => idx.row === r && idx.col === c);
+                        
+                        let estilosCelda = "background: #1e293b; color: #f8fafc; font-size: 11px; font-weight: bold; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 4px;";
+                        
+                        if (esLibre) {
+                            estilosCelda = "background: #334155; color: #94a3b8; font-size: 9px; font-weight: bold; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 4px;";
+                        } 
+                        
+                        if (esGanadora) {
+                            estilosCelda = "background: #16a34a !important; color: #ffffff !important; font-size: 11px; font-weight: 900; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 4px; box-shadow: 0 0 8px #4ade80; border: 1px solid #86efac;";
+                        }
+
+                        let textoCelda = esLibre ? 'FREE' : val;
+                        htmlDetalles += `<div style="${estilosCelda}">${textoCelda}</div>`;
+                    }
+                }
+                htmlDetalles += `</div></div>`;
+            });
+            htmlDetalles += `</div>`;
+
+            let descripcionGanadores = `¡Se han detectado los siguientes ganadores en la mesa!<br><div style="margin-top: 6px; color: #fef08a; font-size: 13px;">${resumenTextos.join('<br>')}</div>`;
+
+            showModal(
+                "🎉 ¡BINGO CANTADO! 🎉",
+                descripcionGanadores,
+                htmlDetalles
+            );
+        }
+
+        function showModal(title, description, details) {
+            document.getElementById('win-title').textContent = title;
+            document.getElementById('win-description').innerHTML = description;
+            document.getElementById('win-details').innerHTML = details;
+            document.getElementById('win-modal').classList.remove('hidden');
+        }
+
+        function closeWinModal() { document.getElementById('win-modal').classList.add('hidden'); }
+
+        function clearAllMarks() {
+            cardMarks = {};
+            alreadyDeclaredWins.clear();
+            selectedCardsIds.forEach(id => cardMarks[id] = { "2-2": true });
+            renderPlayerCards();
+            guardarEstadoEnLocalStorage();
+        }
+
+        function resetGame() {
+            masterMarkedNumbers.clear();
+            cardMarks = {};
+            alreadyDeclaredWins.clear();
+            selectedCardsIds.forEach(id => cardMarks[id] = { "2-2": true });
+            
+            renderMasterBoard();
+            renderPlayerCards();
+            updateDrawnCountBadge();
+            updateRecentBallsHistory();
+            guardarEstadoEnLocalStorage();
+        }
+
+        function downloadApp() {
+            const blob = new Blob([document.documentElement.outerHTML], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'nuevo_bingo_firebase.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function playSound(tipo) {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                if (tipo === 'marcar') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+                    gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.1);
+                } else if (tipo === 'bingo') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+                    osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1);
+                    osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2);
+                    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.5);
+                }
+            } catch (e) {}
+        }
+    </script>
+    <footer class="w-full py-2 mt-auto border-t border-slate-800/80 bg-slate-950 text-center text-slate-400 text-[10px]">
+        <p class="font-medium tracking-wide">
+            Creado y Desarrollado por <span class="text-indigo-400 font-bold">Jcd</span>.
+        </p>
+    </footer>
+
+</body>
+</html>

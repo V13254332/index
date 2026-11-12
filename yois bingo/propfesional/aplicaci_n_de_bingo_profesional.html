@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplicación de Bingo Profesional</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        brand: { 50: '#eef2ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' },
+                        emeraldCard: { bg: '#ecfdf5', border: '#10b981', header: '#059669' },
+                        blueCard: { bg: '#eff6ff', border: '#3b82f6', header: '#2563eb' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .bingo-cell-marked {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+            color: white !important;
+            border-color: #b91c1c !important;
+            transform: scale(0.95);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .animate-bounce-short {
+            animation: bounce 0.6s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 h-full flex flex-col font-sans overflow-x-hidden">
+
+    <header class="bg-slate-800 border-b border-slate-700 px-6 py-4 flex flex-wrap justify-between items-center shadow-lg">
+        <div class="flex items-center space-x-3">
+            <div class="bg-gradient-to-tr from-indigo-600 to-violet-500 p-2.5 rounded-xl shadow-md text-white">
+                <i class="fa-solid fa-ticket text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                    Bingo Profesional 75 Bolas
+                    <span class="text-xs bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded-full font-medium">Lotes 1, 2 y 3</span>
+                </h1>
+                <p class="text-xs text-slate-400">Sistema completo con cartones Verdes y Azules</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3 mt-3 sm:mt-0">
+            <button onclick="downloadApp()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-xl text-sm font-semibold transition border border-slate-600 flex items-center gap-2 shadow-sm">
+                <i class="fa-solid fa-download text-indigo-400"></i> Descargar App
+            </button>
+            <button onclick="resetGame()" class="bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2">
+                <i class="fa-solid fa-rotate-right"></i> Reiniciar Partida
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-y-auto">
+        
+        <section class="lg:col-span-5 flex flex-col gap-6">
+            <!-- Balotera / Bola Actual Card -->
+            <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl relative overflow-hidden flex flex-col items-center">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+                <h2 class="text-sm uppercase tracking-wider text-slate-400 font-semibold mb-3 w-full text-left flex justify-between items-center">
+                    <span><i class="fa-solid fa-bullseye text-indigo-400 mr-2"></i> Bolillero Actual</span>
+                    <span id="balls-remaining-badge" class="text-xs bg-slate-700 text-slate-300 px-2.5 py-1 rounded-lg">75 bolas restantes</span>
+                </h2>
+
+                <!-- Current Ball Display -->
+                <div class="my-4 flex flex-col items-center justify-center">
+                    <div id="current-ball-display" class="w-32 h-32 rounded-3xl bg-gradient-to-br from-indigo-500 to-violet-700 border-4 border-indigo-300 shadow-2xl flex flex-col items-center justify-center transform transition-all duration-300">
+                        <span id="current-ball-letter" class="text-indigo-200 font-bold text-lg tracking-widest">BINGO</span>
+                        <span id="current-ball-number" class="text-white font-black text-5xl tracking-tight">--</span>
+                    </div>
+                </div>
+
+                <!-- Control Buttons -->
+                <div class="grid grid-cols-2 gap-3 w-full mt-2">
+                    <button onclick="drawBall()" id="btn-draw" class="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-dice text-lg"></i> Extraer Bola
+                    </button>
+                    <button onclick="toggleAutoDraw()" id="btn-auto" class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-3 px-4 rounded-xl border border-slate-600 transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-play text-emerald-400" id="auto-icon"></i> <span id="auto-text">Modo Automático</span>
+                    </button>
+                </div>
+
+                <!-- Voice Speech Toggle & Speed -->
+                <div class="flex items-center justify-between w-full mt-4 pt-4 border-t border-slate-700 text-sm text-slate-300">
+                    <label class="flex items-center gap-2 cursor-pointer select-none">
+                        <input type="checkbox" id="speech-toggle" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 bg-slate-900 border-slate-600" checked>
+                        <span>Voz Sintetizada</span>
+                    </label>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-slate-400">Velocidad Auto:</span>
+                        <select id="auto-speed" class="bg-slate-900 border border-slate-700 rounded-lg text-xs py-1 px-2 text-slate-300 focus:outline-none focus:border-indigo-500">
+                            <option value="4000">4s</option>
+                            <option value="6000" selected>6s</option>
+                            <option value="8000">8s</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Last 5 Balls History -->
+            <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-clock-rotate-left text-indigo-400"></i> Últimos Números Cantados
+                </h3>
+                <div id="last-balls-container" class="flex gap-2.5 overflow-x-auto py-1 min-h-[64px] items-center">
+                    <span class="text-xs text-slate-500 italic">Aún no se han cantado números...</span>
+                </div>
+            </div>
+
+            <!-- Master Board (1-75) -->
+            <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl flex-1">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                        <i class="fa-solid fa-table-cells text-indigo-400"></i> Tablero Maestro (1 - 75)
+                    </h3>
+                </div>
+                <div class="grid grid-cols-5 gap-1.5 text-center" id="master-board">
+                    <!-- Javascript will fill 1-75 grid here -->
+                </div>
+            </div>
+        </section>
+
+        <section class="lg:col-span-7 flex flex-col gap-6">
+            
+            <!-- Cards Controls & Auto-mark toggle -->
+            <div class="bg-slate-800 border border-slate-700 rounded-2xl p-4 shadow-xl flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <span class="bg-indigo-500/10 text-indigo-400 p-2.5 rounded-xl border border-indigo-500/20">
+                        <i class="fa-solid fa-layer-group text-lg"></i>
+                    </span>
+                    <div>
+                        <h2 class="font-bold text-white">Cartones de los Lotes</h2>
+                        <p class="text-xs text-slate-400">Verdes (Lote 1, 2) y Azules (Lote 3)</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <label class="flex items-center gap-2 cursor-pointer bg-slate-700/50 hover:bg-slate-700 px-3 py-2 rounded-xl border border-slate-600 text-sm select-none transition">
+                        <input type="checkbox" id="auto-mark-toggle" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 bg-slate-900 border-slate-600" checked>
+                        <span class="font-medium text-slate-200">Marcado Automático</span>
+                    </label>
+                    <button onclick="clearAllMarks()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 p-2 rounded-xl text-sm transition" title="Limpiar marcas de cartones">
+                        <i class="fa-solid fa-eraser"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Accordion Container for Batches -->
+            <div class="space-y-4" id="batches-accordion-container">
+                <!-- Batch 1: Verdes -->
+                <div class="bg-slate-800 border border-emerald-500/30 rounded-2xl overflow-hidden shadow-xl">
+                    <button onclick="toggleAccordion('batch-1')" class="w-full px-5 py-4 bg-emerald-950/40 hover:bg-emerald-950/60 border-b border-emerald-500/20 flex justify-between items-center transition text-left">
+                        <div class="flex items-center gap-3">
+                            <span class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <div>
+                                <h3 class="font-bold text-emerald-300 text-base">Lote 1: Cartones Verdes (1 - 3)</h3>
+                                <p class="text-xs text-emerald-400/80">Estándar Clásico Verde</p>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-down text-emerald-400 transition-transform duration-300" id="icon-batch-1"></i>
+                    </button>
+                    <div id="content-batch-1" class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-850/50">
+                        <!-- Inserted via JS -->
+                    </div>
+                </div>
+
+                <!-- Batch 2: Verdes Adicionales -->
+                <div class="bg-slate-800 border border-emerald-600/30 rounded-2xl overflow-hidden shadow-xl">
+                    <button onclick="toggleAccordion('batch-2')" class="w-full px-5 py-4 bg-emerald-950/30 hover:bg-emerald-950/50 border-b border-emerald-600/20 flex justify-between items-center transition text-left">
+                        <div class="flex items-center gap-3">
+                            <span class="w-3 h-3 rounded-full bg-emerald-400"></span>
+                            <div>
+                                <h3 class="font-bold text-emerald-300 text-base">Lote 2: Cartones Verdes Especiales (4 - 6)</h3>
+                                <p class="text-xs text-emerald-400/80">Variantes de Lote Verde</p>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-down text-emerald-400 transition-transform duration-300" id="icon-batch-2"></i>
+                    </button>
+                    <div id="content-batch-2" class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-850/50">
+                        <!-- Inserted via JS -->
+                    </div>
+                </div>
+
+                <!-- Batch 3: Azules -->
+                <div class="bg-slate-800 border border-blue-500/30 rounded-2xl overflow-hidden shadow-xl">
+                    <button onclick="toggleAccordion('batch-3')" class="w-full px-5 py-4 bg-blue-950/40 hover:bg-blue-950/60 border-b border-blue-500/20 flex justify-between items-center transition text-left">
+                        <div class="flex items-center gap-3">
+                            <span class="w-3 h-3 rounded-full bg-blue-500 animate-pulse"></span>
+                            <div>
+                                <h3 class="font-bold text-blue-300 text-base">Lote 3: Cartones Azules (7 - 10)</h3>
+                                <p class="text-xs text-blue-400/80">Edición Especial Azul Profesional</p>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-down text-blue-400 transition-transform duration-300" id="icon-batch-3"></i>
+                    </button>
+                    <div id="content-batch-3" class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-850/50">
+                        <!-- Inserted via JS -->
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="win-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-indigo-500/40 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl text-center relative overflow-hidden transform transition-all">
+            <div class="absolute -top-12 -right-12 w-40 h-40 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="w-20 h-20 bg-gradient-to-tr from-emerald-500 to-teal-400 rounded-2xl mx-auto flex items-center justify-center text-white text-3xl shadow-lg shadow-emerald-500/30 mb-5">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+            <h3 class="text-2xl font-black text-white mb-2" id="win-title">¡BINGO CANTADO!</h3>
+            <p class="text-slate-300 text-sm mb-6" id="win-description">El cartón ha completado con éxito la figura ganadora.</p>
+            <div class="bg-slate-900/80 border border-slate-700 rounded-2xl p-4 mb-6 text-left">
+                <div class="text-xs text-slate-400 font-semibold mb-1">DETALLES DEL GANADOR:</div>
+                <div id="win-details" class="text-white font-bold text-sm">Cartón #1 (Verde)</div>
+            </div>
+            <button onclick="closeWinModal()" class="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold py-3 px-6 rounded-xl shadow-lg transition">
+                Continuar Partida
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Data structure for 10 Professional Bingo Cards (75-ball standard distributions)
+        // B:1-15, I:16-30, N:31-45, G:46-60, O:61-75
+        const bingoCardsData = [
+            // Lote 1: Verdes (1 - 3)
+            {
+                id: 1, title: "Cartón Verde #1", batch: "batch-1", color: "emerald",
+                numbers: [
+                    [4, 18, 32, 48, 61],
+                    [12, 22, 38, 52, 68],
+                    [7, 26, "FREE", 55, 71],
+                    [14, 29, 41, 58, 74],
+                    [2, 19, 44, 46, 64]
+                ]
+            },
+            {
+                id: 2, title: "Cartón Verde #2", batch: "batch-1", color: "emerald",
+                numbers: [
+                    [9, 21, 33, 47, 65],
+                    [3, 27, 36, 50, 62],
+                    [11, 24, "FREE", 59, 70],
+                    [15, 17, 42, 53, 73],
+                    [5, 30, 39, 49, 67]
+                ]
+            },
+            {
+                id: 3, title: "Cartón Verde #3", batch: "batch-1", color: "emerald",
+                numbers: [
+                    [8, 20, 31, 46, 63],
+                    [1, 25, 37, 54, 72],
+                    [13, 28, "FREE", 51, 66],
+                    [6, 16, 40, 57, 75],
+                    [10, 23, 43, 60, 69]
+                ]
+            },
+            // Lote 2: Verdes Adicionales (4 - 6)
+            {
+                id: 4, title: "Cartón Verde #4", batch: "batch-2", color: "emerald",
+                numbers: [
+                    [2, 16, 35, 48, 62],
+                    [10, 24, 31, 55, 71],
+                    [14, 29, "FREE", 50, 66],
+                    [7, 22, 42, 58, 74],
+                    [4, 19, 39, 46, 61]
+                ]
+            },
+            {
+                id: 5, title: "Cartón Verde #5", batch: "batch-2", color: "emerald",
+                numbers: [
+                    [12, 28, 34, 49, 64],
+                    [6, 17, 40, 52, 70],
+                    [3, 21, "FREE", 57, 73],
+                    [15, 25, 43, 60, 68],
+                    [9, 18, 32, 46, 75]
+                ]
+            },
+            {
+                id: 6, title: "Cartón Verde #6", batch: "batch-2", color: "emerald",
+                numbers: [
+                    [1, 23, 37, 51, 67],
+                    [8, 19, 41, 54, 72],
+                    [13, 26, "FREE", 59, 63],
+                    [5, 20, 33, 47, 69],
+                    [11, 27, 44, 56, 74]
+                ]
+            },
+            // Lote 3: Azules (7 - 10)
+            {
+                id: 7, title: "Cartón Azul #7", batch: "batch-3", color: "blue",
+                numbers: [
+                    [15, 30, 45, 60, 75],
+                    [5, 20, 35, 50, 65],
+                    [10, 25, "FREE", 55, 70],
+                    [2, 17, 32, 47, 62],
+                    [8, 23, 38, 53, 68]
+                ]
+            },
+            {
+                id: 8, title: "Cartón Azul #8", batch: "batch-3", color: "blue",
+                numbers: [
+                    [3, 18, 33, 48, 63],
+                    [12, 27, 42, 57, 72],
+                    [7, 22, "FREE", 52, 67],
+                    [14, 29, 31, 46, 61],
+                    [9, 24, 39, 54, 69]
+                ]
+            },
+            {
+                id: 9, title: "Cartón Azul #9", batch: "batch-3", color: "blue",
+                numbers: [
+                    [6, 21, 36, 51, 66],
+                    [1, 16, 31, 58, 73],
+                    [11, 26, "FREE", 49, 64],
+                    [4, 19, 40, 55, 70],
+                    [13, 28, 43, 60, 75]
+                ]
+            },
+            {
+                id: 10, title: "Cartón Azul #10", batch: "batch-3", color: "blue",
+                numbers: [
+                    [7, 22, 37, 52, 67],
+                    [2, 17, 43, 59, 74],
+                    [15, 30, "FREE", 48, 63],
+                    [10, 25, 34, 56, 71],
+                    [5, 20, 39, 46, 62]
+                ]
+            }
+        ];
+
+        // State variables
+        let drawnBalls = [];
+        let availableBalls = Array.from({length: 75}, (_, i) => i + 1);
+        let isAutoRunning = false;
+        let autoInterval = null;
+        let cardMarks = {}; // Stores checked/marked cells per card ID e.g. { 1: { "0-0": true, ... } }
+
+        // Initialize App on load
+        window.onload = function() {
+            initMasterBoard();
+            initPlayerCards();
+            // Initialize card marks state
+            bingoCardsData.forEach(card => {
+                cardMarks[card.id] = { "2-2": true }; // Free center cell always marked
+            });
+            renderPlayerCards();
+        };
+
+        function initMasterBoard() {
+            const boardContainer = document.getElementById('master-board');
+            boardContainer.innerHTML = '';
+            for (let i = 1; i <= 75; i++) {
+                const cell = document.createElement('div');
+                cell.id = `master-num-${i}`;
+                cell.className = 'bg-slate-900 border border-slate-700/80 rounded-lg p-1.5 text-center text-xs font-bold text-slate-400 flex items-center justify-center transition-all duration-200';
+                cell.textContent = i;
+                boardContainer.appendChild(cell);
+            }
+        }
+
+        function initPlayerCards() {
+            ['batch-1', 'batch-2', 'batch-3'].forEach(batchKey => {
+                const container = document.getElementById(`content-${batchKey}`);
+                container.innerHTML = '';
+                const batchCards = bingoCardsData.filter(c => c.batch === batchKey);
+                
+                batchCards.forEach(card => {
+                    const cardWrapper = document.createElement('div');
+                    cardWrapper.className = `bg-slate-900 border ${card.color === 'emerald' ? 'border-emerald-500/30' : 'border-blue-500/30'} rounded-xl p-3 shadow-md flex flex-col`;
+                    
+                    // Card Header
+                    let headerHTML = `
+                        <div class="flex justify-between items-center mb-2 pb-2 border-b ${card.color === 'emerald' ? 'border-emerald-500/20' : 'border-blue-500/20'}">
+                            <span class="font-bold text-sm ${card.color === 'emerald' ? 'text-emerald-400' : 'text-blue-400'} flex items-center gap-1.5">
+                                <i class="fa-solid fa-ticket"></i> ${card.title}
+                            </span>
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700" id="card-status-${card.id}">En juego</span>
+                                <button onclick="checkManualWin(${card.id})" class="text-xs bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 px-2 py-0.5 rounded transition border border-indigo-500/30" title="Verificar BINGO">Verificar</button>
+                            </div>
+                        </div>
+                    `;
+
+                    // BINGO headers
+                    let gridHTML = `<div class="grid grid-cols-5 gap-1 text-center font-black text-xs mb-1 ${card.color === 'emerald' ? 'text-emerald-500' : 'text-blue-500'}">
+                        <div>B</div><div>I</div><div>N</div><div>G</div><div>O</div>
+                    </div>`;
+
+                    // 5x5 Matrix Grid
+                    gridHTML += `<div class="grid grid-cols-5 gap-1" id="card-grid-${card.id}">`;
+                    for (let r = 0; r < 5; r++) {
+                        for (let col = 0; col < 5; col++) {
+                            let val = card.numbers[r][col];
+                            let isFree = val === "FREE";
+                            let cellKey = `${r}-${col}`;
+                            let marked = isFree ? true : (cardMarks[card.id] && cardMarks[card.id][cellKey]);
+                            
+                            gridHTML += `
+                                <button onclick="toggleCellMark(${card.id}, ${r}, ${col}, '${val}')" 
+                                    id="cell-${card.id}-${r}-${col}"
+                                    class="h-9 rounded-lg font-bold text-xs flex items-center justify-center transition-all duration-200 border ${
+                                        isFree ? 'bg-indigo-600 text-white border-indigo-500 text-[10px]' : 
+                                        marked ? 'bingo-cell-marked' : 'bg-slate-800 text-slate-200 border-slate-700 hover:border-slate-500'
+                                    }">
+                                    ${isFree ? 'FREE' : val}
+                                </button>
+                            `;
+                        }
+                    }
+                    gridHTML += `</div>`;
+
+                    cardWrapper.innerHTML = headerHTML + gridHTML;
+                    container.appendChild(cardWrapper);
+                });
+            });
+        }
+
+        function renderPlayerCards() {
+            bingoCardsData.forEach(card => {
+                for (let r = 0; r < 5; r++) {
+                    for (let col = 0; col < 5; col++) {
+                        let val = card.numbers[r][col];
+                        if (val === "FREE") continue;
+                        let cellKey = `${r}-${col}`;
+                        let isMarked = cardMarks[card.id] && cardMarks[card.id][cellKey];
+                        let btn = document.getElementById(`cell-${card.id}-${r}-${col}`);
+                        if (btn) {
+                            if (isMarked) {
+                                btn.classList.add('bingo-cell-marked');
+                                btn.classList.remove('bg-slate-800', 'text-slate-200', 'border-slate-700');
+                            } else {
+                                btn.classList.remove('bingo-cell-marked');
+                                btn.classList.add('bg-slate-800', 'text-slate-200', 'border-slate-700');
+                            }
+                        }
+                    }
+                }
+                // Check win condition automatically if auto-mark is enabled
+                checkCardWinState(card.id);
+            });
+        }
+
+        function drawBall() {
+            if (availableBalls.length === 0) {
+                showModal("¡Bolsa Vacía!", "Se han extraído todas las 75 bolas del bolillero.", "Aviso");
+                stopAutoDraw();
+                return;
+            }
+
+            // Pick random index from available balls
+            const randomIndex = Math.floor(Math.random() * availableBalls.length);
+            const drawnNumber = availableBalls.splice(randomIndex, 1)[0];
+            drawnBalls.push(drawnNumber);
+
+            // Update UI elements
+            updateCurrentBallDisplay(drawnNumber);
+            updateMasterBoard(drawnNumber);
+            updateLastBallsHistory();
+            updateBallsRemainingCount();
+
+            // Auto-mark cards if enabled
+            const autoMarkEnabled = document.getElementById('auto-mark-toggle').checked;
+            if (autoMarkEnabled) {
+                autoMarkNumberOnCards(drawnNumber);
+            }
+
+            // Text-to-Speech
+            speakBall(drawnNumber);
+        }
+
+        function updateCurrentBallDisplay(num) {
+            let letter = getBallLetter(num);
+            document.getElementById('current-ball-letter').textContent = letter;
+            document.getElementById('current-ball-number').textContent = num;
+            
+            const displayCard = document.getElementById('current-ball-display');
+            displayCard.classList.add('scale-105');
+            setTimeout(() => displayCard.classList.remove('scale-105'), 300);
+        }
+
+        function getBallLetter(num) {
+            if (num <= 15) return 'B';
+            if (num <= 30) return 'I';
+            if (num <= 45) return 'N';
+            if (num <= 60) return 'G';
+            return 'O';
+        }
+
+        function updateMasterBoard(num) {
+            const cell = document.getElementById(`master-num-${num}`);
+            if (cell) {
+                cell.className = 'bg-gradient-to-tr from-indigo-600 to-violet-600 border border-indigo-400 rounded-lg p-1.5 text-center text-xs font-black text-white shadow-md shadow-indigo-600/30 transform scale-105';
+            }
+        }
+
+        function updateLastBallsHistory() {
+            const container = document.getElementById('last-balls-container');
+            const recent = drawnBalls.slice(-5).reverse();
+            
+            if (recent.length === 0) {
+                container.innerHTML = '<span class="text-xs text-slate-500 italic">Aún no se han cantado números...</span>';
+                return;
+            }
+
+            container.innerHTML = '';
+            recent.forEach((num, index) => {
+                let letter = getBallLetter(num);
+                let badge = document.createElement('div');
+                badge.className = `flex flex-col items-center justify-center w-11 h-11 rounded-xl font-bold text-xs shadow-md border ${
+                    index === 0 ? 'bg-indigo-600 text-white border-indigo-400 scale-105' : 'bg-slate-900 text-slate-300 border-slate-700 opacity-80'
+                }`;
+                badge.innerHTML = `<span class="text-[9px] uppercase opacity-75 font-medium">${letter}</span><span class="text-sm font-extrabold">${num}</span>`;
+                container.appendChild(badge);
+            });
+        }
+
+        function updateBallsRemainingCount() {
+            document.getElementById('balls-remaining-badge').textContent = `${availableBalls.length} bolas restantes`;
+        }
+
+        function speakBall(num) {
+            const speechToggle = document.getElementById('speech-toggle').checked;
+            if (!speechToggle || !('speechSynthesis' in window)) return;
+
+            let letter = getBallLetter(num);
+            let textToSpeech = `${letter} ${num}`;
+            let utterance = new SpeechSynthesisUtterance(textToSpeech);
+            utterance.lang = 'es-ES';
+            utterance.rate = 1.0;
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function autoMarkNumberOnCards(num) {
+            bingoCardsData.forEach(card => {
+                for (let r = 0; r < 5; r++) {
+                    for (let col = 0; col < 5; col++) {
+                        if (card.numbers[r][col] === num) {
+                            if (!cardMarks[card.id]) cardMarks[card.id] = {};
+                            cardMarks[card.id][`${r}-${col}`] = true;
+                        }
+                    }
+                }
+            });
+            renderPlayerCards();
+        }
+
+        function toggleCellMark(cardId, r, col, val) {
+            if (val === "FREE") return; // Free cell is always marked
+            if (!cardMarks[cardId]) cardMarks[cardId] = {};
+            let cellKey = `${r}-${col}`;
+            cardMarks[cardId][cellKey] = !cardMarks[cardId][cellKey];
+            renderPlayerCards();
+        }
+
+        function checkCardWinState(cardId) {
+            let card = bingoCardsData.find(c => c.id === cardId);
+            if (!card) return;
+            let marks = cardMarks[cardId] || {};
+            let isMarked = (r, c) => card.numbers[r][c] === "FREE" || marks[`${r}-${c}`];
+
+            let hasLine = false;
+            let fullHouse = true;
+
+            // Check rows & columns & diagonals
+            for (let i = 0; i < 5; i++) {
+                let rowWin = true;
+                let colWin = true;
+                for (let j = 0; j < 5; j++) {
+                    if (!isMarked(i, j)) rowWin = false;
+                    if (!isMarked(j, i)) colWin = false;
+                    if (!isMarked(i, j)) fullHouse = false;
+                }
+                if (rowWin || colWin) hasLine = true;
+            }
+
+            let statusBadge = document.getElementById(`card-status-${cardId}`);
+            if (fullHouse) {
+                statusBadge.textContent = "¡BINGO!";
+                statusBadge.className = "text-[10px] bg-rose-500 text-white px-2 py-0.5 rounded font-bold animate-bounce-short";
+            } else if (hasLine) {
+                statusBadge.textContent = "¡LÍNEA!";
+                statusBadge.className = "text-[10px] bg-emerald-500 text-white px-2 py-0.5 rounded font-bold";
+            } else {
+                statusBadge.textContent = "En juego";
+                statusBadge.className = "text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700";
+            }
+        }
+
+        function checkManualWin(cardId) {
+            let card = bingoCardsData.find(c => c.id === cardId);
+            let marks = cardMarks[cardId] || {};
+            let isMarked = (r, c) => card.numbers[r][c] === "FREE" || marks[`${r}-${c}`];
+
+            let hasLine = false;
+            let fullHouse = true;
+
+            for (let i = 0; i < 5; i++) {
+                let rowWin = true;
+                let colWin = true;
+                for (let j = 0; j < 5; j++) {
+                    if (!isMarked(i, j)) rowWin = false;
+                    if (!isMarked(j, i)) colWin = false;
+                    if (!isMarked(i, j)) fullHouse = false;
+                }
+                if (rowWin || colWin) hasLine = true;
+            }
+
+            if (fullHouse) {
+                showModal("¡BINGO LLENO!", `El cartón <strong>${card.title}</strong> ha completado el BINGO LLENO con éxito.`, card.title);
+            } else if (hasLine) {
+                showModal("¡LÍNEA VALIDADA!", `El cartón <strong>${card.title}</strong> ha completado una línea ganadora.`, card.title);
+            } else {
+                showModal("Sin premios aún", `El cartón <strong>${card.title}</strong> aún no cumple con las condiciones de línea o bingo lleno.`, card.title);
+            }
+        }
+
+        function toggleAccordion(batchKey) {
+            const content = document.getElementById(`content-${batchKey}`);
+            const icon = document.getElementById(`icon-${batchKey}`);
+            if (content.style.display === 'none') {
+                content.style.display = 'grid';
+                icon.style.transform = 'rotate(0deg)';
+            } else {
+                content.style.display = 'none';
+                icon.style.transform = 'rotate(-90deg)';
+            }
+        }
+
+        function toggleAutoDraw() {
+            if (isAutoRunning) {
+                stopAutoDraw();
+            } else {
+                startAutoDraw();
+            }
+        }
+
+        function startAutoDraw() {
+            isAutoRunning = true;
+            document.getElementById('auto-icon').className = 'fa-solid fa-pause text-rose-400';
+            document.getElementById('auto-text').textContent = 'Pausar Automático';
+            let speed = parseInt(document.getElementById('auto-speed').value);
+            
+            autoInterval = setInterval(() => {
+                if (availableBalls.length > 0) {
+                    drawBall();
+                } else {
+                    stopAutoDraw();
+                }
+            }, speed);
+        }
+
+        function stopAutoDraw() {
+            isAutoRunning = false;
+            clearInterval(autoInterval);
+            document.getElementById('auto-icon').className = 'fa-solid fa-play text-emerald-400';
+            document.getElementById('auto-text').textContent = 'Modo Automático';
+        }
+
+        function clearAllMarks() {
+            bingoCardsData.forEach(card => {
+                cardMarks[card.id] = { "2-2": true };
+            });
+            renderPlayerCards();
+        }
+
+        function resetGame() {
+            stopAutoDraw();
+            drawnBalls = [];
+            availableBalls = Array.from({length: 75}, (_, i) => i + 1);
+            initMasterBoard();
+            clearAllMarks();
+            updateLastBallsHistory();
+            updateBallsRemainingCount();
+            document.getElementById('current-ball-letter').textContent = 'BINGO';
+            document.getElementById('current-ball-number').textContent = '--';
+        }
+
+        function showModal(title, desc, details) {
+            document.getElementById('win-title').textContent = title;
+            document.getElementById('win-description').textContent = desc;
+            document.getElementById('win-details').innerHTML = details;
+            document.getElementById('win-modal').classList.remove('hidden');
+        }
+
+        function closeWinModal() {
+            document.getElementById('win-modal').classList.add('hidden');
+        }
+
+        function downloadApp() {
+            const htmlContent = document.documentElement.outerHTML;
+            const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Bingo_Profesional_75.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>

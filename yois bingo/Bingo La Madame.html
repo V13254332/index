@@ -1,0 +1,1733 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EL PROFE BINGUERO</title>
+    <!-- Librería de Confeti CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #222831;
+            --text-color: #eeeeee;
+            --panel-bg: #393e46;
+            --border-color: #4e5561;
+            --accent-color: #00adb5;
+        }
+
+        body.tema-clasico {
+            --bg-color: #1b4332;
+            --text-color: #f8f9fa;
+            --panel-bg: #2d6a4f;
+            --border-color: #52b788;
+            --accent-color: #ffd166;
+        }
+
+        body.tema-neon {
+            --bg-color: #0f172a;
+            --text-color: #f8fafc;
+            --panel-bg: #1e293b;
+            --border-color: #38bdf8;
+            --accent-color: #f43f5e;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background: var(--bg-color); color: var(--text-color); padding: 4px; padding-bottom: 60px; transition: background 0.3s; }
+
+        header { text-align: center; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; padding: 0 4px; flex-wrap: wrap; gap: 4px; }
+        header h1 { font-size: 1rem; color: var(--accent-color); letter-spacing: 0.5px; }
+
+        .header-btns { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+        .btn-voz-toggle {
+            background: var(--panel-bg); border: 1px solid var(--accent-color); color: var(--accent-color);
+            padding: 2px 6px; font-size: 0.6rem; border-radius: 4px; cursor: pointer; font-weight: bold;
+        }
+        .btn-voz-toggle.activo { background: var(--accent-color); color: var(--bg-color); }
+
+        .selector-temas-header { display: flex; gap: 3px; align-items: center; }
+        .btn-tema {
+            border: none; border-radius: 3px; padding: 2px 5px; font-size: 0.55rem; font-weight: bold; cursor: pointer;
+        }
+
+        .container { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: row; gap: 6px; align-items: flex-start; }
+
+        .panel-fijo { 
+            background: var(--panel-bg); padding: 4px; border-radius: 6px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3); border: 1px solid var(--border-color);
+            position: sticky; top: 4px; width: 45%; flex-shrink: 0;
+        }
+        .panel-fijo h2 { font-size: 0.75rem; margin-bottom: 3px; color: var(--accent-color); display: flex; justify-content: space-between; align-items: center; }
+        
+        .btn-reiniciar { background: #e74c3c; color: white; border: none; border-radius: 3px; padding: 1px 4px; font-size: 0.55rem; font-weight: bold; cursor: pointer; }
+
+        .panel-historial-bolillas {
+            background: var(--bg-color); border: 1px solid var(--accent-color); border-radius: 4px; padding: 4px; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;
+        }
+        .historial-titulo { font-size: 0.55rem; color: var(--accent-color); font-weight: bold; text-transform: uppercase; white-space: nowrap; }
+        .historial-bolas-container { display: flex; gap: 3px; overflow-x: auto; flex-grow: 1; padding-bottom: 2px; }
+        .bola-historial-item {
+            background: var(--accent-color); color: var(--bg-color); font-size: 0.65rem; font-weight: bold; width: 22px; height: 22px;
+            display: flex; align-items: center; justify-content: center; border-radius: 50%; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        .bola-historial-item.ultima { background: #f1c40f; transform: scale(1.1); color: #000; }
+
+        .tablero-vertical-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; background: var(--bg-color); padding: 2px; border-radius: 3px; border: 1.5px solid var(--accent-color); }
+        .columna-bingo { display: flex; flex-direction: column; gap: 2px; }
+        .letra-bingo { background: var(--accent-color); color: var(--bg-color); text-align: center; font-size: 0.65rem; font-weight: bold; padding: 2px 0; border-radius: 2px; }
+        
+        .celda-tablero { 
+            background: var(--bg-color); color: #ffffff; padding: 3px 0; text-align: center; font-size: 0.65rem; font-weight: bold; 
+            border: 1px solid var(--border-color); border-radius: 2px; user-select: none; cursor: pointer; -webkit-tap-highlight-color: transparent; 
+        }
+        .celda-tablero:active { transform: scale(0.95); }
+        .celda-tablero.cantado { background: #27ae60 !important; border-color: #2ecc71 !important; color: white !important; }
+        
+        .celda-tablero.falta-tablero {
+            background: #e67e22 !important; 
+            border-color: #f1c40f !important; 
+            color: #ffffff !important;
+            animation: parpadeoFuerte 0.4s infinite alternate ease-in-out !important;
+        }
+        @keyframes parpadeoFuerte { 
+            0% { background: #e67e22; transform: scale(1); box-shadow: 0 0 8px #f1c40f; } 
+            100% { background: #c0392b; transform: scale(1.05); box-shadow: 0 0 12px #e74c3c; } 
+        }
+
+        .panel-a-pique { background: var(--bg-color); border: 1px solid #e67e22; border-radius: 4px; padding: 4px; margin-top: 5px; }
+        .panel-a-pique h3 { font-size: 0.65rem; color: #f39c12; margin-bottom: 3px; display: flex; align-items: center; gap: 3px; }
+        .lista-a-pique-items { display: flex; flex-direction: column; gap: 3px; max-height: 120px; overflow-y: auto; }
+        .item-a-pique { background: var(--panel-bg); border-left: 3px solid #f39c12; padding: 3px 5px; border-radius: 2px; font-size: 0.55rem; color: #fff; line-height: 1.3; }
+
+        .columna-gestion { display: flex; flex-direction: column; gap: 6px; width: 55%; min-width: 0; }
+        .seccion-cartones-lateral { background: var(--panel-bg); padding: 6px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); border: 1px solid var(--border-color); }
+        .seccion-cartones-lateral h2 { font-size: 0.75rem; margin-bottom: 4px; color: var(--accent-color); display: flex; justify-content: space-between; align-items: center; }
+
+        .input-buscador-carton { background: var(--bg-color); border: 1px solid var(--border-color); color: #fff; font-size: 0.6rem; padding: 2px 5px; border-radius: 3px; width: 100px; }
+        
+        .acciones-cartones-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; gap: 4px; }
+        .btn-eliminar-todos { background: #c0392b; color: white; border: none; border-radius: 3px; padding: 2px 5px; font-size: 0.55rem; font-weight: bold; cursor: pointer; }
+        .btn-eliminar-todos:hover { background: #e74c3c; }
+
+        .contenedor-cartones-vertical { display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; padding-right: 2px; }
+        
+        .card-carton-activo { 
+            background: var(--bg-color); border: 2px solid #f1c40f; padding: 6px; border-radius: 6px; position: relative; 
+            box-shadow: 0 2px 6px rgba(241, 196, 15, 0.2);
+        }
+        .card-carton-activo.inactivo { opacity: 0.5; border-style: dashed; border-color: var(--border-color); }
+
+        .btn-eliminar-carton { position: absolute; top: 4px; right: 6px; background: transparent; color: #e74c3c; border: none; font-size: 0.7rem; cursor: pointer; font-weight: bold; }
+        .btn-estado-carton { position: absolute; top: 4px; right: 22px; background: transparent; color: #f1c40f; border: none; font-size: 0.7rem; cursor: pointer; font-weight: bold; }
+
+        .mini-carton-wrapper { display: flex; flex-direction: column; gap: 1px; max-width: 130px; margin: 3px auto 0 auto; background: var(--bg-color); padding: 2px; border-radius: 3px; border: 1px solid #f39c12; }
+        .mini-header-bingo { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; }
+        
+        .mini-letra-th { 
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); 
+            color: #ffffff; 
+            font-size: 0.55rem; 
+            font-weight: 900; 
+            text-align: center; 
+            padding: 2px 0; 
+            border-radius: 1px; 
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.3);
+        }
+        
+        .mini-carton-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; margin-top: 1px; }
+        .mini-celda { background: var(--panel-bg); color: #eeeeee; padding: 3px 0; text-align: center; font-size: 0.55rem; font-weight: bold; border-radius: 1px; }
+        .mini-celda.marcada { background: #27ae60; color: white; }
+        .mini-celda.libre { background: #f39c12; color: white; font-size: 0.45rem; }
+
+        .mini-celda.modalidad-parte { background: #34495e; color: #bdc3c7; opacity: 0.6; }
+        .mini-celda.modalidad-parte.marcada { background: #27ae60; color: white; opacity: 1; }
+        .mini-celda.modalidad-destacada { 
+            background: #e67e22 !important; 
+            color: white !important; 
+            border: 1px solid #f1c40f !important;
+            box-shadow: 0 0 6px #f1c40f;
+            animation: brilloModalidad 0.6s infinite alternate ease-in-out;
+        }
+        .mini-celda.modalidad-destacada.marcada { 
+            background: #27ae60 !important; 
+            color: #ffffff !important; 
+            border: 2px solid #f1c40f !important;
+            box-shadow: 0 0 10px #2ecc71, 0 0 5px #f1c40f;
+        }
+        @keyframes brilloModalidad {
+            0% { transform: scale(1); filter: brightness(1); }
+            100% { transform: scale(1.08); filter: brightness(1.3); }
+        }
+
+        .etiqueta-aviso { display: inline-block; background: #f39c12; color: white; padding: 1px 4px; text-align: center; border-radius: 2px; font-size: 0.5rem; font-weight: bold; margin-top: 4px; width: 100%; }
+        .etiqueta-ganador { display: inline-block; background: #27ae60; color: white; padding: 1px 4px; text-align: center; border-radius: 2px; font-size: 0.5rem; font-weight: bold; margin-top: 4px; width: 100%; }
+
+        .desplegable-panel { background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); overflow: hidden; margin-bottom: 2px; }
+        .desplegable-panel summary { font-size: 0.75rem; color: var(--accent-color); font-weight: bold; padding: 6px 8px; cursor: pointer; user-select: none; background: var(--panel-bg); display: flex; align-items: center; justify-content: space-between; }
+        .contenido-panel-desplegable { padding: 6px; border-top: 1px solid var(--border-color); background: rgba(0,0,0,0.15); }
+
+        .grid-modalidades-selector { display: grid; grid-template-columns: repeat(2, 1fr); gap: 3px; margin-bottom: 6px; }
+        .checkbox-label { display: flex; align-items: center; gap: 4px; font-size: 0.65rem; color: #e5e7eb; background: var(--bg-color); padding: 3px 5px; border-radius: 3px; border: 1px solid var(--border-color); cursor: pointer; }
+        .checkbox-label input { accent-color: var(--accent-color); cursor: pointer; }
+
+        .btn-precarga { background: #f39c12; color: #222831; border: none; width: 100%; padding: 5px; font-size: 0.7rem; font-weight: bold; border-radius: 4px; cursor: pointer; margin-bottom: 4px; }
+        .btn-precarga:hover { background: #e67e22; }
+
+        .input-individual { background: var(--bg-color); border: 1px solid var(--border-color); color: #fff; font-size: 0.65rem; padding: 4px 6px; border-radius: 3px; width: 60px; text-align: center; font-weight: bold; }
+        .input-nombre-jugador { background: var(--bg-color); border: 1px solid var(--border-color); color: #fff; font-size: 0.65rem; padding: 4px 6px; border-radius: 3px; flex-grow: 1; }
+
+        .input-texto-mod { background: var(--bg-color); border: 1px solid var(--border-color); color: #fff; font-size: 0.65rem; padding: 4px 6px; border-radius: 3px; width: 100%; margin-bottom: 4px; }
+        .creador-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; background: var(--bg-color); padding: 3px; border-radius: 3px; max-width: 150px; margin: 4px auto; }
+        .celda-creador { background: var(--panel-bg); color: #fff; text-align: center; font-size: 0.6rem; padding: 6px 0; border-radius: 2px; cursor: pointer; user-select: none; font-weight: bold; }
+        .celda-creador.seleccionada { background: var(--accent-color); color: var(--bg-color); }
+        .celda-creador.centro { background: #f39c12; color: #fff; cursor: default; }
+
+        .btn-flotante-proyector {
+            position: fixed; bottom: 12px; right: 12px; background: var(--accent-color); color: var(--bg-color);
+            border: none; border-radius: 40px; padding: 8px 12px; font-size: 0.75rem; font-weight: bold;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.4); cursor: pointer; z-index: 2500;
+            display: flex; align-items: center; gap: 4px;
+        }
+
+        .btn-flotante-admin {
+            position: fixed; bottom: 12px; left: 12px; background: #e74c3c; color: white;
+            border: none; border-radius: 40px; padding: 8px 12px; font-size: 0.75rem; font-weight: bold;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.4); cursor: pointer; z-index: 2500;
+            display: flex; align-items: center; gap: 4px;
+        }
+
+        body.modo-proyector .panel-fijo { position: relative; width: 100%; max-width: 500px; margin: 0 auto; z-index: 2000; padding: 8px; background: var(--panel-bg); }
+        body.modo-proyector .panel-fijo h2 { font-size: 1rem; margin-bottom: 6px; }
+        body.modo-proyector .tablero-vertical-grid { gap: 3px; padding: 3px; }
+        body.modo-proyector .letra-bingo { font-size: 0.85rem; padding: 3px 0; }
+        body.modo-proyector .celda-tablero { font-size: 0.9rem; padding: 8px 0; }
+        body.modo-proyector .columna-gestion, body.modo-proyector header, body.modo-proyector .footer-creditos, body.modo-proyector .btn-flotante-admin { display: none !important; }
+
+        .footer-creditos {
+            text-align: center; margin-top: 12px; padding: 6px; font-size: 0.6rem; color: #9ca3af;
+            letter-spacing: 0.5px; border-top: 1px dashed var(--border-color);
+        }
+
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.92); justify-content: center; align-items: center; z-index: 99999; backdrop-filter: blur(4px); }
+        .modal-content { 
+            background: linear-gradient(135deg, #2b2d42 0%, #1d1e2c 100%); color: #fff; padding: 20px 16px; border-radius: 16px; text-align: center; width: 92%; max-width: 320px; 
+            border: 3px solid #f1c40f; box-shadow: 0 10px 30px rgba(241, 196, 15, 0.5);
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes popIn {
+            0% { transform: scale(0.7); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .detalle-ganador-box { background: rgba(0, 0, 0, 0.35); padding: 8px; border-radius: 8px; border: 1px solid rgba(241, 196, 15, 0.3); font-size: 0.8rem; color: #ecf0f1; line-height: 1.4; margin-bottom: 10px; }
+        .btn-festivo { background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%); width: 100%; padding: 8px; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: bold; color: white; cursor: pointer; }
+
+        .admin-panel-container { background: var(--panel-bg); border: 2px solid var(--accent-color); padding: 8px; border-radius: 6px; }
+        .admin-panel-container h3 { font-size: 0.75rem; color: var(--accent-color); margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+        .lista-historial-sesion { max-height: 100px; overflow-y: auto; background: var(--bg-color); padding: 4px; border-radius: 4px; font-size: 0.55rem; color: #cbd5e1; }
+        .item-hist-sesion { border-bottom: 1px solid var(--border-color); padding: 2px 0; }
+
+        @media print {
+            body { background: white !important; color: black !important; }
+            header, .columna-gestion, .btn-flotante-proyector, .btn-flotante-admin, .footer-creditos, .panel-fijo { display: none !important; }
+            .print-view-only { display: block !important; }
+            .print-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+            .print-card { border: 2px solid black; padding: 10px; border-radius: 8px; margin-bottom: 10px; page-break-inside: avoid; background: white; color: black; }
+        }
+        .print-view-only { display: none; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>👨‍🏫 EL PROFE BINGUERO</h1>
+        <div class="header-btns">
+            <!-- Selector de Temas para el Jugador -->
+            <div class="selector-temas-header">
+                <button class="btn-tema" onclick="cambiarTema('streamer')" style="background: #393e46; color: #00adb5;">Streamer</button>
+                <button class="btn-tema" onclick="cambiarTema('clasico')" style="background: #2d6a4f; color: #ffd166;">Clásico</button>
+                <button class="btn-tema" onclick="cambiarTema('neon')" style="background: #1e293b; color: #38bdf8;">Neón</button>
+            </div>
+            <button id="btn-voz" class="btn-voz-toggle" onclick="alternarVoz()">🔊 Voz: OFF</button>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="panel-fijo" id="panel-tablero-principal">
+            <h2>
+                <span>🎯 Tablero</span>
+                <div style="display: flex; gap: 4px; align-items: center;">
+                    <span id="contador-cantados" style="font-size: 0.6rem; color: #9ca3af;">0/75</span>
+                    <button class="btn-reiniciar" onclick="reiniciarTablero()" title="Reiniciar">🔄</button>
+                </div>
+            </h2>
+            <div class="panel-historial-bolillas">
+                <span class="historial-titulo">Últimas:</span>
+                <div class="historial-bolas-container" id="historial-bolas-container">
+                    <span style="font-size: 0.5rem; color: #9ca3af; padding-top: 3px;">Sin cantar</span>
+                </div>
+            </div>
+            <div class="tablero-vertical-grid" id="tablero-principal"></div>
+            <div class="panel-a-pique">
+                <h3>⚡ Cartones a Pique (Falta 1)</h3>
+                <div class="lista-a-pique-items" id="lista-a-pique-container">
+                    <div style="font-size: 0.55rem; color: #9ca3af; text-align: center;">Ninguno a pique.</div>
+                </div>
+            </div>
+        </section>
+
+        <div class="columna-gestion">
+            
+            <details class="desplegable-panel" open>
+                <summary>🔍 Carga Individual de Cartones (Ej. 11, 15, 235)</summary>
+                <div class="contenido-panel-desplegable">
+                    <div style="display: flex; gap: 4px; align-items: center; margin-bottom: 4px;">
+                        <input type="text" id="input-carton-individual" class="input-individual" placeholder="Nº (Ej. 11)">
+                        <input type="text" id="input-nombre-jugador-ind" class="input-nombre-jugador" placeholder="Nombre del Jugador (Opcional)">
+                    </div>
+                    <button class="btn-precarga" onclick="cargarCartonIndividual()" style="margin-bottom: 0;">➕ Añadir Cartón</button>
+                </div>
+            </details>
+
+            <section class="seccion-cartones-lateral">
+                <h2>
+                    <span>👀 Cartones Registrados</span>
+                </h2>
+                <div class="acciones-cartones-header">
+                    <input type="text" id="buscador-carton" class="input-buscador-carton" placeholder="🔍 Buscar Nº o Nombre..." oninput="actualizarInterfazJugadores()">
+                    <button class="btn-eliminar-todos" onclick="eliminarTodosLosCartones()" title="Eliminar todos los cartones registrados">🗑️ Eliminar Todos</button>
+                </div>
+                <div class="contenedor-cartones-vertical" id="lista-cartones-activos">
+                    <p style="font-size: 0.65rem; color: #9ca3af; text-align: center; width: 100%;">Sin cartones cargados.</p>
+                </div>
+            </section>
+
+            <details class="desplegable-panel">
+                <summary>⚙️ Modalidades y Creación Personalizada</summary>
+                <div class="contenido-panel-desplegable">
+                    <p style="font-size: 0.6rem; color: var(--accent-color); font-weight: bold; margin-bottom: 3px;">Modalidades Activas:</p>
+                    <div class="grid-modalidades-selector" id="contenedor-selector-modalidades"></div>
+                    
+                    <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 6px 0;">
+                    
+                    <p style="font-size: 0.6rem; color: #f39c12; font-weight: bold; margin-bottom: 3px;">➕ Crear Modalidad Personalizada:</p>
+                    <input type="text" id="input-nombre-nueva-mod" class="input-texto-mod" placeholder="Nombre (Ej. La Cruz, Marco, etc.)">
+                    <p style="font-size: 0.55rem; color: #9ca3af; text-align: center; margin-bottom: 2px;">Toca las casillas que forman la figura:</p>
+                    <div class="creador-grid" id="grid-creador-modalidad"></div>
+                    <button class="btn-precarga" onclick="guardarNuevaModalidad()" style="background: #27ae60; color: white; margin-top: 4px;">💾 Guardar y Activar Modalidad</button>
+                </div>
+            </details>
+
+            <details class="desplegable-panel">
+                <summary>📦 Carga Rápida de Lotes Completos (01 al 252)</summary>
+                <div class="contenido-panel-desplegable">
+                    <div style="display: flex; gap: 3px; margin-bottom: 4px;">
+                        <select id="select-lote" style="margin-bottom: 0; font-size: 0.65rem; flex-grow: 1;">
+                            <option value="1_6">Lote 01 al 06</option>
+                            <option value="7_12">Lote 07 al 12</option>
+                            <option value="13_18">Lote 13 al 18</option>
+                            <option value="19_24">Lote 19 al 24</option>
+                            <option value="25_30">Lote 25 al 30</option>
+                            <option value="31_36">Lote 31 al 36</option>
+                            <option value="37_42">Lote 37 al 42</option>
+                            <option value="43_48">Lote 43 al 48</option>
+                            <option value="49_54">Lote 49 al 54</option>
+                            <option value="55_60">Lote 55 al 60</option>
+                            <option value="61_66">Lote 61 al 66</option>
+                            <option value="67_72">Lote 67 al 72</option>
+                            <option value="73_78">Lote 73 al 78</option>
+                            <option value="79_84">Lote 79 al 84</option>
+                            <option value="85_90">Lote 85 al 90</option>
+                            <option value="91_96">Lote 91 al 96</option>
+                            <option value="97_102">Lote 97 al 102</option>
+                            <option value="103_108">Lote 103 al 108</option>
+                            <option value="109_114">Lote 109 al 114</option>
+                            <option value="115_120">Lote 115 al 120</option>
+                            <option value="121_126">Lote 121 al 126</option>
+                            <option value="127_132">Lote 127 al 132</option>
+                            <option value="133_138">Lote 133 al 138</option>
+                            <option value="139_144">Lote 139 al 144</option>
+                            <option value="145_150">Lote 145 al 150</option>
+                            <option value="151_156">Lote 151 al 156</option>
+                            <option value="157_162">Lote 157 al 162</option>
+                            <option value="163_168">Lote 163 al 168</option>
+                            <option value="169_174">Lote 169 al 174</option>
+                            <option value="175_180">Lote 175 al 180</option>
+                            <option value="181_186">Lote 181 al 186</option>
+                            <option value="187_192">Lote 187 al 192</option>
+                            <option value="193_198">Lote 193 al 198</option>
+                            <option value="199_204">Lote 199 al 204</option>
+                            <option value="205_210">Lote 205 al 210</option>
+                            <option value="211_216">Lote 211 al 216</option>
+                            <option value="217_222">Lote 217 al 222</option>
+                            <option value="223_228">Lote 223 al 228</option>
+                            <option value="229_234">Lote 229 al 234</option>
+                            <option value="235_240">Lote 235 al 240</option>
+                            <option value="241_246">Lote 241 al 246</option>
+                            <option value="247_252">Lote 247 al 252</option>
+                        </select>
+                        <button class="btn-precarga" onclick="cargarLoteSeleccionado()" style="margin-bottom: 0; width: auto; padding: 4px 8px;">➕ Cargar Lote</button>
+                    </div>
+                    <button class="btn-precarga" onclick="cargarTodosLosLotes()" style="background: #27ae60; color: white; margin-bottom: 4px;">🚀 Cargar TODOS los Lotes (01 al 252)</button>
+                    <!-- BOTÓN RÁPIDO PARA PROBAR EL CONFETI -->
+                    <button class="btn-precarga" onclick="probarConfetiStream()" style="background: #f1c40f; color: #222831;">🎉 Probar Lluvia de Confeti</button>
+                </div>
+            </details>
+        </div>
+    </main>
+
+    <!-- VISTA IMPRESIÓN OCULTA HASTA ACTIVARSE -->
+    <div id="vista-impresion-contenedor" class="print-view-only" style="padding: 20px;">
+        <h1 style="text-align: center; margin-bottom: 20px;">EL PROFE BINGUERO - CARTONES ACTIVOS DE LA SESIÓN</h1>
+        <div id="print-cards-grid" class="print-grid"></div>
+    </div>
+
+    <footer class="footer-creditos">
+        CREADO Y DESARROLLADO POR JUAN C. DELGADO 👨‍🏫✨
+    </footer>
+
+    <!-- BOTONES FLOTANTES -->
+    <button class="btn-flotante-admin" onclick="abrirModalAdmin()">
+        🔐 Admin
+    </button>
+
+    <button class="btn-flotante-proyector" id="btn-proyector" onclick="alternarProyector()">
+        📽️ <span id="texto-btn-proyector">Proyector</span>
+    </button>
+
+    <!-- MODAL DE ADMIN PROTEGIDO CON CONTRASEÑA -->
+    <div id="modal-admin" class="modal">
+        <div class="modal-content" style="max-width: 340px; text-align: left;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h2 style="color: #f1c40f; font-size: 1rem; margin-bottom: 0;">🛠️ Panel Admin</h2>
+                <button onclick="cerrarModalAdmin()" class="btn-reiniciar" style="font-size: 0.6rem; padding: 2px 6px;">✕</button>
+            </div>
+
+            <!-- Bloque de Contraseña -->
+            <div id="admin-bloqueado">
+                <p style="font-size: 0.65rem; margin-bottom: 6px; color: #cbd5e1;">Introduce tu contraseña de administrador:</p>
+                <div style="display: flex; gap: 4px;">
+                    <input type="password" id="input-pass-admin" class="input-nombre-jugador" placeholder="Contraseña...">
+                    <button class="btn-precarga" onclick="verificarPasswordAdmin()" style="margin-bottom: 0; width: auto; background: #27ae60; color:white;">Entrar</button>
+                </div>
+            </div>
+
+            <!-- Contenido Protegido una vez dentro -->
+            <div id="admin-desbloqueado" style="display: none;">
+                
+                <!-- Validador Express por Número -->
+                <p style="font-size: 0.6rem; color: var(--accent-color); font-weight: bold; margin-bottom: 3px;">🔍 Validar Cartón por Número:</p>
+                <div style="display: flex; gap: 4px; margin-bottom: 6px;">
+                    <input type="text" id="val-num-carton" class="input-individual" placeholder="Nº (Ej. 45)">
+                    <select id="val-modalidad-select" style="font-size: 0.6rem; flex-grow: 1; background: var(--bg-color); color: #fff; border: 1px solid var(--border-color); border-radius: 3px;">
+                        <!-- Se llena dinámicamente con todas las modalidades -->
+                    </select>
+                </div>
+                <button class="btn-precarga" onclick="validarCartonExpress()" style="background: #27ae60; color: white; margin-bottom: 8px; font-size: 0.6rem;">✔️ Validar y Mostrar Cartón</button>
+
+                <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 6px 0;">
+
+                <!-- Impresión -->
+                <p style="font-size: 0.6rem; color: var(--accent-color); font-weight: bold; margin-bottom: 3px;">🖨️ Vista de Impresión / Generador:</p>
+                <button class="btn-precarga" onclick="abrirVistaImpresion()" style="background: #38bdf8; color: #0f172a; margin-bottom: 8px; font-size: 0.6rem;">📄 Generar Vista Imprimible</button>
+
+                <!-- Historial de Ganadores -->
+                <p style="font-size: 0.6rem; color: var(--accent-color); font-weight: bold; margin-bottom: 3px;">🏆 Historial de Ganadores de la Sesión:</p>
+                <div class="lista-historial-sesion" id="lista-historial-ganadores-sesion" style="max-height: 100px;">
+                    <div style="text-align: center; color: #9ca3af; padding: 4px;">Aún no hay ganadores en esta sesión.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE GANADOR / VALIDACIÓN -->
+    <div id="modal-ganador" class="modal">
+        <div class="modal-content">
+            <span id="modal-icono-titulo" style="font-size: 2.5rem; margin-bottom: 2px; display: block;">🏆🥳</span>
+            <h2 id="modal-titulo-texto" style="color: #f1c40f; font-size: 1.2rem; margin-bottom: 6px;">¡B I N G O !</h2>
+            <div class="detalle-ganador-box" id="contenido-ganador-individual"></div>
+            <button onclick="cerrarModalGanador()" class="btn-festivo">¡Cerrar! 🎉</button>
+        </div>
+    </div>
+
+    <script>
+        let numerosCantados = new Set();
+        let historialCantadosArray = [];
+        let listaJugadores = [];
+        let historialGanadoresSesion = [];
+        let elementosTablero = {};
+        let colaGanadoresPendientes = [];
+        let vozActiva = false;
+        const PASSWORD_ADMIN = "profe123";
+
+        // --- SISTEMA DE AUDIO WEB (EFECTOS DE FEEDBACK) ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function reproducirSonido(tipo) {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            let now = audioCtx.currentTime;
+
+            if (tipo === 'marcar') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
+                gainNode.gain.setValueAtTime(0.15, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                osc.start(now);
+                osc.stop(now + 0.08);
+            } else if (tipo === 'ganador') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(523.25, now);
+                osc.frequency.setValueAtTime(659.25, now + 0.1);
+                osc.frequency.setValueAtTime(783.99, now + 0.2);
+                osc.frequency.setValueAtTime(1046.50, now + 0.3);
+                gainNode.gain.setValueAtTime(0.2, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+                osc.start(now);
+                osc.stop(now + 0.6);
+            } else if (tipo === 'click') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300, now);
+                gainNode.gain.setValueAtTime(0.05, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.04);
+                osc.start(now);
+                osc.stop(now + 0.04);
+            }
+        }
+
+        // --- ANIMACIÓN DE CONFETI FESTIVO ---
+        function lanzarConfetiFestivo() {
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 120,
+                    spread: 80,
+                    origin: { y: 0.6 },
+                    colors: ['#f1c40f', '#2ecc71', '#38bdf8', '#e74c3c', '#9b59b6']
+                });
+            }
+        }
+
+        function probarConfetiStream() {
+            reproducirSonido('ganador');
+            lanzarConfetiFestivo();
+        }
+
+        let modalidadesDisponibles = {
+            "carton_lleno": { nombre: "Cartón Lleno", tipo: "predefinida" },
+            "linea": { nombre: "Línea (Hor/Ver)", tipo: "predefinida" },
+            "cuatro_esquinas": { nombre: "4 Esquinas", tipo: "predefinida" },
+            "letra_x": { nombre: "Letra X", tipo: "predefinida" }
+        };
+
+        let matrizCreadorModalidad = [
+            [false, false, false, false, false],
+            [false, false, false, false, false],
+            [false, false, true,  false, false],
+            [false, false, false, false, false],
+            [false, false, false, false, false]
+        ];
+
+        // --- BASE DE DATOS MAESTRA COMPLETA (LOTES 01 AL 252) ---
+        const masterCartonesDB = {
+            "1_6": [
+                { num: "01", grilla: [[6,17,40,47,69],[11,24,41,48,63],[9,29,"FREE",49,73],[5,19,33,51,71],[1,28,36,59,67]] },
+                { num: "02", grilla: [[4,27,43,57,74],[14,25,37,58,70],[13,18,"FREE",53,66],[10,16,39,60,72],[8,22,35,54,61]] },
+                { num: "03", grilla: [[3,21,38,46,68],[7,23,44,50,65],[12,26,"FREE",52,64],[2,20,42,56,62],[15,30,31,55,75]] },
+                { num: "04", grilla: [[3,24,43,46,62],[7,26,41,48,73],[11,23,"FREE",59,69],[5,28,33,52,63],[10,29,35,56,68]] },
+                { num: "05", grilla: [[6,18,36,54,67],[8,22,37,50,61],[15,21,"FREE",58,72],[12,27,32,60,64],[9,30,45,51,74]] },
+                { num: "06", grilla: [[4,25,42,55,71],[14,17,34,57,75],[13,20,"FREE",47,66],[1,16,44,49,70],[2,19,31,53,65]] }
+            ],
+            "7_12": [
+                { num: "07", grilla: [[1,30,34,58,65],[15,16,38,48,72],[4,25,"FREE",47,75],[10,17,43,56,71],[3,19,44,46,63]] },
+                { num: "08", grilla: [[13,22,42,53,73],[12,20,40,54,66],[5,27,"FREE",49,61],[7,28,36,51,64],[9,26,35,55,68]] },
+                { num: "09", grilla: [[2,24,31,60,67],[14,29,41,52,69],[6,21,"FREE",59,74],[11,23,32,50,62],[8,18,37,57,70]] },
+                { num: "10", grilla: [[5,28,44,52,69],[8,23,40,47,74],[14,25,"FREE",54,73],[12,27,43,59,65],[6,18,39,48,66]] },
+                { num: "11", grilla: [[7,24,45,58,68],[1,22,34,57,61],[3,30,"FREE",55,71],[10,26,38,46,64],[11,21,36,60,70]] },
+                { num: "12", grilla: [[9,20,35,51,63],[15,16,31,49,67],[13,19,"FREE",53,72],[4,17,42,50,75],[2,29,33,56,62]] }
+            ],
+            "13_18": [
+                { num: "13", grilla: [[12,17,42,57,66],[10,25,34,49,72],[11,20,"FREE",51,70],[9,29,41,50,67],[13,27,36,54,62]] },
+                { num: "14", grilla: [[5,24,40,55,64],[4,16,37,46,65],[6,28,"FREE",53,63],[1,23,31,56,69],[8,30,44,58,61]] },
+                { num: "15", grilla: [[3,18,43,59,75],[14,22,35,52,68],[7,26,"FREE",48,73],[15,21,33,60,74],[2,19,32,47,71]] },
+                { num: "16", grilla: [[3,16,42,57,61],[5,21,33,50,70],[6,18,"FREE",51,73],[2,28,39,60,72],[11,22,45,52,63]] },
+                { num: "17", grilla: [[14,27,37,53,65],[12,26,35,55,66],[8,20,"FREE",49,64],[4,29,40,46,69],[7,19,43,48,74]] },
+                { num: "18", grilla: [[10,30,31,54,71],[1,24,38,56,67],[9,17,"FREE",58,62],[13,25,41,59,68],[15,23,44,47,75]] }
+            ],
+            "19_24": [
+                { num: "19", grilla: [[11,24,32,58,65],[12,17,34,59,74],[2,25,"FREE",54,70],[15,28,42,55,62],[9,26,41,57,73]] },
+                { num: "20", grilla: [[13,18,35,48,69],[5,27,36,53,75],[4,19,"FREE",52,63],[10,29,31,46,71],[1,16,39,56,68]] },
+                { num: "21", grilla: [[6,21,40,60,66],[8,20,38,50,67],[3,23,"FREE",47,61],[14,30,43,51,64],[7,22,33,49,72]] },
+                { num: "22", grilla: [[2,21,39,59,69],[8,25,33,51,62],[3,29,"FREE",58,70],[10,28,34,53,73],[14,19,35,48,63]] },
+                { num: "23", grilla: [[4,20,37,47,71],[13,23,44,60,61],[12,16,"FREE",50,72],[9,26,43,49,74],[1,18,38,57,66]] },
+                { num: "24", grilla: [[15,24,45,52,64],[6,17,40,54,65],[5,27,"FREE",46,75],[7,30,31,55,67],[11,22,36,56,68]] }
+            ],
+            "25_30": [
+                { num: "25", grilla: [[5,26,38,50,74],[11,17,42,56,71],[3,23,"FREE",59,63],[6,21,44,55,62],[4,18,40,51,68]] },
+                { num: "26", grilla: [[9,27,33,60,73],[10,29,36,49,66],[13,28,"FREE",48,65],[2,25,31,57,64],[7,30,41,53,69]] },
+                { num: "27", grilla: [[12,22,39,54,72],[14,20,34,52,75],[8,19,"FREE",47,67],[1,16,45,46,61],[15,24,32,58,70]] },
+                { num: "28", grilla: [[12,27,37,54,64],[10,29,45,59,67],[4,22,"FREE",50,68],[5,25,36,58,70],[14,24,35,47,61]] },
+                { num: "29", grilla: [[6,16,43,60,74],[7,18,34,51,69],[9,19,"FREE",46,71],[3,17,40,53,63],[15,23,33,49,65]] },
+                { num: "30", grilla: [[1,28,38,52,73],[2,26,42,55,72],[8,21,"FREE",56,66],[11,30,44,57,62],[13,20,39,48,75]] }
+            ],
+            "31_36": [
+                { num: "31", grilla: [[4,21,34,55,61],[12,24,39,47,68],[1,29,"FREE",58,71],[10,16,33,50,70],[8,27,41,59,65]] },
+                { num: "32", grilla: [[3,20,43,46,72],[14,23,32,52,69],[5,26,"FREE",51,67],[9,17,35,60,74],[11,28,36,54,63]] },
+                { num: "33", grilla: [[2,18,37,49,66],[7,25,40,57,75],[13,22,"FREE",53,64],[6,19,42,56,73],[15,30,31,55,62]] },
+                { num: "34", grilla: [[13,19,32,48,68],[11,22,41,54,61],[3,27,"FREE",52,70],[8,23,37,50,74],[1,20,45,55,63]] },
+                { num: "35", grilla: [[6,24,35,47,72],[5,16,39,56,67],[10,29,"FREE",58,75],[14,21,31,51,69],[2,26,38,59,65]] },
+                { num: "36", grilla: [[12,28,40,53,66],[7,17,34,50,62],[4,25,"FREE",49,71],[9,18,43,57,64],[15,30,42,60,73]] }
+            ],
+            "37_42": [
+                { num: "37", grilla: [[5,22,34,59,71],[15,26,38,51,63],[2,20,"FREE",46,67],[11,19,42,57,70],[8,27,31,50,65]] },
+                { num: "38", grilla: [[13,18,40,55,66],[7,23,33,48,62],[1,25,"FREE",53,74],[10,29,36,49,61],[4,21,44,52,69]] },
+                { num: "39", grilla: [[3,16,35,47,73],[12,24,41,54,75],[9,28,"FREE",58,68],[6,17,37,56,72],[14,30,39,60,64]] },
+                { num: "40", grilla: [[2,23,36,53,65],[14,20,44,56,73],[11,18,"FREE",50,61],[4,25,32,48,67],[7,27,41,59,70]] },
+                { num: "41", grilla: [[13,29,38,47,68],[5,21,31,55,71],[12,22,"FREE",51,64],[1,17,42,54,74],[10,24,33,58,62]] },
+                { num: "42", grilla: [[9,16,37,49,75],[8,26,40,60,63],[3,19,"FREE",46,69],[6,28,34,52,66],[15,30,43,57,72]] }
+            ],
+            "43_48": [
+                { num: "43", grilla: [[1,19,33,49,74],[10,23,38,52,61],[7,27,"FREE",56,66],[14,29,40,50,69],[3,22,44,58,72]] },
+                { num: "44", grilla: [[8,25,36,54,62],[13,17,41,46,68],[11,26,"FREE",53,71],[2,21,31,57,64],[6,20,43,47,75]] },
+                { num: "45", grilla: [[12,18,34,51,67],[5,24,37,60,70],[4,28,"FREE",48,65],[9,16,39,55,73],[15,30,42,59,63]] },
+                { num: "46", grilla: [[11,27,31,55,70],[8,21,39,50,61],[6,16,"FREE",47,66],[13,22,35,53,74],[4,29,42,59,67]] },
+                { num: "47", grilla: [[2,18,33,52,63],[15,24,44,58,75],[10,26,"FREE",46,65],[1,23,37,56,72],[9,25,40,60,68]] },
+                { num: "48", grilla: [[14,20,38,48,71],[5,19,34,51,69],[3,27,"FREE",54,64],[12,28,36,49,62],[7,21,41,57,73]] }
+            ],
+            "49_54": [
+                { num: "49", grilla: [[6,24,35,50,67],[11,16,42,53,71],[8,21,"FREE",57,70],[2,28,31,56,64],[13,19,39,49,61]] },
+                { num: "50", grilla: [[1,26,44,55,73],[15,22,37,48,68],[3,23,"FREE",58,63],[10,29,40,52,66],[7,18,34,51,75]] },
+                { num: "51", grilla: [[4,25,32,46,74],[9,20,38,59,65],[12,27,"FREE",54,62],[5,17,36,60,72],[14,30,41,47,69]] },
+                { num: "52", grilla: [[8,19,37,47,65],[10,21,31,55,74],[13,23,"FREE",50,71],[2,27,44,53,62],[6,26,34,49,68]] },
+                { num: "53", grilla: [[3,16,41,52,67],[11,28,35,58,69],[4,25,"FREE",56,75],[12,22,39,60,63],[7,20,40,46,70]] },
+                { num: "54", grilla: [[1,24,38,51,62],[15,29,43,54,61],[9,18,"FREE",49,73],[5,26,32,57,66],[14,21,36,48,72]] }
+            ],
+            "55_60": [
+                { num: "55", grilla: [[6,23,31,56,72],[2,28,39,52,64],[15,26,"FREE",48,69],[8,17,36,60,61],[11,21,45,46,75]] },
+                { num: "56", grilla: [[10,16,33,50,63],[4,25,37,49,70],[13,29,"FREE",53,66],[7,20,40,57,74],[1,24,42,55,67]] },
+                { num: "57", grilla: [[9,22,38,51,65],[12,19,34,58,73],[3,27,"FREE",59,71],[5,18,41,54,62],[14,30,35,47,68]] },
+                { num: "58", grilla: [[11,27,41,57,61],[4,23,36,49,72],[13,20,"FREE",52,69],[2,25,38,60,75],[7,19,32,51,66]] },
+                { num: "59", grilla: [[15,16,34,53,67],[8,29,39,46,74],[1,21,"FREE",50,63],[10,26,31,58,70],[3,22,43,55,64]] },
+                { num: "60", grilla: [[5,24,37,56,73],[6,18,40,48,65],[12,28,"FREE",54,62],[9,17,35,59,71],[14,27,42,47,68]] }
+            ],
+            "61_66": [
+                { num: "61", grilla: [[2,22,34,53,74],[11,25,43,47,66],[15,20,"FREE",52,70],[8,27,37,50,62],[3,18,40,56,68]] },
+                { num: "62", grilla: [[12,21,39,58,61],[4,19,32,49,71],[6,26,"FREE",55,75],[13,29,35,60,67],[1,16,42,51,64]] },
+                { num: "63", grilla: [[7,28,33,46,65],[10,17,38,54,69],[5,24,"FREE",57,72],[14,23,36,59,63],[9,30,41,48,66]] },
+                { num: "64", grilla: [[14,19,41,49,65],[5,21,36,56,72],[12,27,"FREE",53,64],[2,24,31,52,68],[11,26,44,58,70]] },
+                { num: "65", grilla: [[8,23,34,55,71],[1,18,40,47,63],[10,25,"FREE",51,75],[13,22,38,60,67],[4,29,32,54,66]] },
+                { num: "66", grilla: [[3,20,33,52,73],[6,26,39,59,62],[15,28,"FREE",50,69],[7,16,35,46,74],[9,21,42,57,61]] }
+            ],
+            "67_72": [
+                { num: "67", grilla: [[10,23,43,51,62],[6,20,31,58,74],[15,29,"FREE",54,67],[4,16,36,46,71],[12,27,40,50,66]] },
+                { num: "68", grilla: [[5,18,34,53,72],[13,22,39,49,69],[1,21,"FREE",57,61],[8,25,32,60,75],[11,26,42,48,64]] },
+                { num: "69", grilla: [[2,24,37,56,65],[7,19,41,47,70],[9,28,"FREE",52,63],[14,16,35,55,73],[3,30,38,59,68]] },
+                { num: "70", grilla: [[15,27,33,57,71],[1,18,38,52,65],[8,20,"FREE",46,66],[13,21,34,59,74],[10,25,41,50,62]] },
+                { num: "71", grilla: [[3,22,32,56,61],[6,23,40,51,68],[11,29,"FREE",54,75],[4,16,37,49,69],[14,26,44,53,64]] },
+                { num: "72", grilla: [[12,19,39,55,70],[5,21,31,48,73],[2,24,"FREE",58,72],[7,28,36,50,67],[9,17,42,60,63]] }
+            ],
+            "73_78": [
+                { num: "73", grilla: [[13,24,36,53,61],[8,17,32,56,69],[1,22,"FREE",52,72],[4,29,41,51,64],[11,20,44,48,75]] },
+                { num: "74", grilla: [[3,16,31,50,68],[10,26,38,57,74],[15,21,"FREE",47,65],[6,25,35,55,70],[12,28,43,49,63]] },
+                { num: "75", grilla: [[7,19,42,51,71],[5,23,33,48,66],[2,27,"FREE",59,62],[9,24,40,54,73],[14,20,37,58,67]] },
+                { num: "76", grilla: [[11,27,35,46,67],[1,24,33,55,62],[14,19,"FREE",59,71],[5,21,39,51,66],[8,29,42,50,73]] },
+                { num: "77", grilla: [[12,16,34,53,74],[6,28,40,49,64],[3,22,"FREE",54,75],[10,25,37,58,69],[13,20,41,57,63]] },
+                { num: "78", grilla: [[9,23,38,52,70],[15,26,32,48,61],[4,21,"FREE",56,72],[7,18,36,60,65],[2,30,44,47,68]] }
+            ],
+            "79_84": [
+                { num: "79", grilla: [[15,20,31,57,72],[6,27,38,49,69],[2,21,"FREE",47,64],[8,24,41,50,66],[10,18,43,59,74]] },
+                { num: "80", grilla: [[13,24,34,55,65],[1,25,35,46,61],[11,28,"FREE",53,71],[4,19,39,52,75],[12,22,44,60,67]] },
+                { num: "81", grilla: [[3,17,40,51,73],[9,23,33,56,62],[7,26,"FREE",58,70],[5,29,36,54,68],[14,16,42,48,63]] },
+                { num: "82", grilla: [[4,28,32,59,68],[12,21,37,56,75],[13,17,"FREE",48,63],[10,23,44,52,61],[6,26,40,49,70]] },
+                { num: "83", grilla: [[7,19,34,54,62],[9,25,36,55,69],[1,24,"FREE",51,71],[2,20,41,47,67],[15,22,31,60,74]] },
+                { num: "84", grilla: [[11,27,33,58,73],[3,21,39,46,66],[5,29,"FREE",50,64],[8,16,35,53,72],[14,26,43,57,65]] }
+            ],
+            "85_90": [
+                { num: "85", grilla: [[2,22,41,48,72],[13,29,35,51,64],[4,25,"FREE",59,69],[7,17,32,53,66],[11,19,38,56,61]] },
+                { num: "86", grilla: [[14,20,36,57,67],[9,27,43,46,62],[1,18,"FREE",55,75],[8,21,33,52,70],[3,24,40,54,63]] },
+                { num: "87", grilla: [[6,26,34,50,71],[5,16,39,58,63],[12,23,"FREE",49,74],[15,28,37,60,68],[10,21,42,47,65]] },
+                { num: "88", grilla: [[13,25,32,53,70],[6,22,44,47,61],[12,18,"FREE",59,65],[2,29,39,51,74],[8,16,37,58,68]] },
+                { num: "89", grilla: [[7,28,33,52,66],[10,20,38,56,73],[1,21,"FREE",48,62],[4,19,42,49,71],[15,24,35,60,69]] },
+                { num: "90", grilla: [[5,21,41,46,64],[11,27,36,54,75],[9,26,"FREE",50,67],[14,17,40,55,72],[3,23,31,57,63]] }
+            ],
+            "91_96": [
+                { num: "91", grilla: [[6,24,39,52,73],[2,16,34,58,61],[10,27,"FREE",46,65],[13,22,41,47,69],[8,29,36,55,70]] },
+                { num: "92", grilla: [[4,21,32,54,68],[12,25,37,59,72],[1,19,"FREE",49,66],[15,23,43,51,64],[7,28,35,50,75]] },
+                { num: "93", grilla: [[9,18,31,56,67],[5,26,40,47,74],[14,20,"FREE",53,63],[3,22,38,60,71],[11,24,44,48,62]] },
+                { num: "94", grilla: [[15,26,40,48,61],[2,23,35,59,69],[12,17,"FREE",52,73],[6,20,31,46,64],[10,21,38,56,70]] },
+                { num: "95", grilla: [[11,19,34,51,75],[8,29,37,54,63],[4,24,"FREE",57,67],[13,16,43,47,66],[1,25,32,58,72]] },
+                { num: "96", grilla: [[7,22,36,50,62],[3,28,42,53,74],[14,21,"FREE",55,68],[9,18,39,49,65],[5,27,31,60,71]] }
+            ],
+            "97_102": [
+                { num: "97", grilla: [[4,29,37,55,61],[1,18,43,46,72],[13,20,"FREE",51,67],[8,26,34,60,74],[11,22,31,48,66]] },
+                { num: "98", grilla: [[6,25,36,53,69],[3,16,40,58,75],[14,27,"FREE",47,63],[10,21,33,52,64],[2,24,42,50,71]] },
+                { num: "99", grilla: [[12,23,38,49,65],[5,28,32,56,62],[7,19,"FREE",50,70],[9,26,35,59,68],[15,21,41,54,73]] },
+                { num: "100", grilla: [[11,25,31,59,71],[7,16,43,51,63],[2,22,"FREE",54,69],[14,26,36,46,74],[8,19,38,57,66]] },
+                { num: "101", grilla: [[10,24,37,49,62],[3,29,40,53,67],[15,18,"FREE",47,75],[4,21,34,55,70],[12,27,32,50,64]] },
+                { num: "102", grilla: [[13,20,35,46,66],[6,28,39,56,73],[1,26,"FREE",58,65],[5,17,33,52,68],[9,23,41,60,72]] }
+            ],
+            "103_108": [
+                { num: "103", grilla: [[7,16,36,48,62],[15,22,39,54,69],[3,25,"FREE",52,74],[1,29,32,57,71],[10,18,43,46,65]] },
+                { num: "104", grilla: [[2,28,34,51,67],[11,23,40,59,70],[5,19,"FREE",53,63],[14,26,37,47,75],[8,20,41,55,61]] },
+                { num: "105", grilla: [[6,24,31,56,73],[9,17,38,50,64],[12,27,"FREE",49,72],[4,21,35,58,68],[13,30,42,46,66]] },
+                { num: "106", grilla: [[11,29,37,53,64],[2,22,42,46,73],[9,16,"FREE",56,75],[14,27,33,50,69],[5,19,40,58,62]] },
+                { num: "107", grilla: [[8,17,35,49,72],[1,24,39,52,66],[15,25,"FREE",57,61],[3,20,31,54,68],[10,28,43,48,70]] },
+                { num: "108", grilla: [[12,26,38,55,67],[6,21,34,47,74],[13,18,"FREE",51,63],[7,23,36,59,65],[4,30,41,50,71]] }
+            ],
+            "109_114": [
+                { num: "109", grilla: [[10,28,33,57,61],[4,21,38,47,75],[13,19,"FREE",51,66],[6,25,35,52,70],[11,22,41,59,64]] },
+                { num: "110", grilla: [[2,16,36,54,69],[7,24,42,56,62],[12,29,"FREE",49,72],[1,20,39,58,65],[15,27,31,50,73]] },
+                { num: "111", grilla: [[5,23,43,46,67],[9,26,34,53,71],[14,18,"FREE",55,63],[8,21,37,60,74],[3,30,40,48,68]] },
+                { num: "112", grilla: [[12,17,37,50,73],[3,25,41,56,66],[15,20,"FREE",48,61],[6,28,32,59,70],[11,24,35,52,65]] },
+                { num: "113", grilla: [[4,23,34,58,67],[8,19,39,46,74],[1,27,"FREE",53,62],[10,21,31,55,71],[14,29,42,51,69]] },
+                { num: "114", grilla: [[9,26,40,49,72],[2,22,35,57,63],[13,16,"FREE",54,65],[5,28,38,60,75],[7,20,44,52,68]] }
+            ],
+            "115_120": [
+                { num: "115", grilla: [[15,22,32,48,61],[1,17,40,56,70],[6,27,"FREE",51,73],[10,23,38,59,64],[3,25,44,54,66]] },
+                { num: "116", grilla: [[5,19,36,52,69],[12,24,41,55,75],[8,20,"FREE",49,63],[2,29,34,60,71],[14,21,33,47,62]] },
+                { num: "117", grilla: [[11,26,37,50,72],[4,16,39,53,65],[13,28,"FREE",58,67],[7,21,31,57,74],[9,18,42,46,68]] },
+                { num: "118", grilla: [[2,20,38,59,65],[9,23,43,51,72],[11,27,"FREE",46,66],[14,18,31,55,74],[6,25,35,48,61]] },
+                { num: "119", grilla: [[7,17,33,52,70],[12,26,36,49,63],[1,21,"FREE",57,69],[4,24,40,54,75],[10,22,41,58,64]] },
+                { num: "120", grilla: [[13,21,34,50,67],[3,29,42,46,73],[15,19,"FREE",55,62],[8,25,37,60,71],[5,16,39,53,68]] }
+            ],
+            "121_126": [
+                { num: "121", grilla: [[10,24,39,51,68],[2,18,33,46,74],[14,29,"FREE",57,62],[5,16,42,59,71],[8,25,37,53,65]] },
+                { num: "122", grilla: [[12,21,36,55,61],[7,27,41,50,67],[3,20,"FREE",52,72],[11,28,34,60,66],[1,17,44,48,75]] },
+                { num: "123", grilla: [[6,19,38,54,70],[15,23,31,47,63],[9,26,"FREE",58,69],[4,22,35,56,73],[13,30,40,49,64]] },
+                { num: "124", grilla: [[8,27,33,56,64],[2,22,42,51,69],[11,18,"FREE",47,71],[13,23,36,58,63],[4,16,39,49,75]] },
+                { num: "125", grilla: [[14,20,40,48,72],[1,29,37,53,67],[5,26,"FREE",50,66],[12,21,32,55,61],[7,24,34,59,70]] },
+                { num: "126", grilla: [[3,25,35,57,73],[10,17,43,52,62],[9,28,"FREE",46,65],[6,19,41,60,68],[15,22,38,54,74]] }
+            ],
+            "127_132": [
+                { num: "127", grilla: [[4,26,38,51,61],[12,20,33,59,75],[1,25,"FREE",54,67],[9,17,36,50,70],[11,28,40,46,64]] },
+                { num: "128", grilla: [[8,19,39,53,74],[6,21,37,47,66],[15,29,"FREE",58,62],[2,23,31,56,71],[10,27,42,49,68]] },
+                { num: "129", grilla: [[5,22,32,55,69],[3,24,44,48,63],[13,27,"FREE",52,72],[7,18,35,60,65],[14,30,41,50,73]] },
+                { num: "130", grilla: [[1,21,37,48,66],[11,26,34,52,70],[14,18,"FREE",56,73],[8,29,43,59,62],[3,24,39,46,65]] },
+                { num: "131", grilla: [[13,20,35,54,74],[4,23,40,57,61],[9,25,"FREE",51,68],[7,28,32,60,67],[2,19,44,47,72]] },
+                { num: "132", grilla: [[6,27,31,50,69],[12,17,38,59,63],[15,22,"FREE",53,75],[5,26,36,49,64],[10,21,42,55,71]] }
+            ],
+            "133_138": [
+                { num: "133", grilla: [[2,25,38,47,72],[10,20,32,59,63],[7,28,"FREE",56,71],[13,17,44,50,68],[4,22,34,54,66]] },
+                { num: "134", grilla: [[11,19,36,53,61],[6,21,41,57,70],[15,24,"FREE",51,65],[3,27,33,49,74],[9,26,40,55,67]] },
+                { num: "135", grilla: [[5,23,39,52,75],[1,29,35,46,64],[12,26,"FREE",58,69],[8,16,37,60,73],[14,21,43,48,62]] },
+                { num: "136", grilla: [[10,26,33,50,64],[3,22,43,58,69],[8,18,"FREE",54,71],[15,29,37,47,75],[1,21,40,56,62]] },
+                { num: "137", grilla: [[7,19,39,55,66],[12,24,35,49,73],[4,27,"FREE",52,68],[11,20,32,60,74],[6,28,42,51,61]] },
+                { num: "138", grilla: [[2,21,37,46,72],[9,25,31,57,65],[14,23,"FREE",59,63],[5,16,41,48,70],[13,30,36,53,67]] }
+            ],
+            "139_144": [
+                { num: "139", grilla: [[1,20,35,59,71],[8,26,42,46,67],[11,21,"FREE",52,64],[6,17,38,55,75],[13,29,31,50,62]] },
+                { num: "140", grilla: [[5,24,36,47,74],[3,18,39,53,66],[14,28,"FREE",58,69],[9,22,33,60,70],[12,25,44,51,63]] },
+                { num: "141", grilla: [[10,16,33,56,65],[7,23,40,49,62],[15,27,"FREE",54,73],[4,19,37,51,68],[2,21,41,57,72]] },
+                { num: "142", grilla: [[12,22,38,51,63],[6,27,33,48,71],[4,20,"FREE",59,68],[9,18,36,54,74],[15,26,42,56,61]] },
+                { num: "143", grilla: [[3,28,41,49,75],[1,24,37,60,65],[13,23,"FREE",52,69],[7,16,34,55,72],[10,21,39,47,62]] },
+                { num: "144", grilla: [[8,19,35,53,70],[11,25,40,57,67],[2,29,"FREE",46,64],[5,17,32,58,73],[14,30,43,50,66]] }
+            ],
+            "145_150": [
+                { num: "145", grilla: [[7,26,37,47,64],[3,21,32,59,72],[15,20,"FREE",51,66],[11,18,43,54,75],[2,25,39,46,61]] },
+                { num: "146", grilla: [[10,23,41,52,68],[6,19,35,55,70],[13,29,"FREE",46,63],[1,24,33,60,74],[8,17,38,49,65]] },
+                { num: "147", grilla: [[4,22,34,50,69],[12,28,40,57,62],[9,27,"FREE",53,71],[5,16,36,58,73],[14,30,42,48,67]] },
+                { num: "148", grilla: [[1,17,36,54,65],[8,22,42,47,73],[10,25,"FREE",58,68],[6,29,32,51,61],[13,20,39,49,71]] },
+                { num: "149", grilla: [[11,26,38,59,72],[3,20,35,53,67],[14,24,"FREE",50,64],[7,18,31,55,75],[2,21,43,46,66]] },
+                { num: "150", grilla: [[5,23,40,48,69],[12,27,33,56,61],[15,28,"FREE",52,74],[4,19,37,60,63],[9,25,41,47,70]] }
+            ],
+            "151_156": [
+                { num: "151", grilla: [[8,28,34,51,62],[2,19,41,47,74],[13,23,"FREE",59,69],[6,21,32,55,70],[10,26,37,48,64]] },
+                { num: "152", grilla: [[12,22,35,53,73],[1,27,38,56,65],[11,20,"FREE",46,67],[4,17,40,58,72],[9,24,31,50,61]] },
+                { num: "153", grilla: [[5,16,39,49,75],[7,25,43,60,68],[15,29,"FREE",52,66],[3,21,36,54,63],[14,30,33,47,71]] },
+                { num: "154", grilla: [[3,25,42,56,63],[10,19,31,48,70],[12,28,"FREE",50,67],[7,16,39,59,71],[15,22,35,52,66]] },
+                { num: "155", grilla: [[6,24,33,53,74],[1,21,37,49,61],[13,27,"FREE",57,69],[4,29,36,55,65],[11,18,40,46,72]] },
+                { num: "156", grilla: [[9,20,38,52,62],[8,26,34,58,75],[14,23,"FREE",51,68],[2,17,41,60,64],[5,27,35,47,70]] }
+            ],
+            "157_162": [
+                { num: "157", grilla: [[4,23,31,57,66],[12,19,36,46,71],[10,26,"FREE",51,75],[8,21,42,55,64],[2,29,39,50,68]] },
+                { num: "158", grilla: [[7,28,37,52,63],[1,17,40,60,69],[15,25,"FREE",53,67],[6,20,33,49,74],[11,24,35,56,62]] },
+                { num: "159", grilla: [[5,22,43,48,70],[9,24,34,54,65],[14,27,"FREE",58,72],[3,16,38,51,61],[13,30,32,47,73]] },
+                { num: "160", grilla: [[10,25,35,50,72],[13,21,41,49,66],[2,20,"FREE",56,61],[7,17,32,58,75],[4,28,38,46,67]] },
+                { num: "161", grilla: [[1,19,39,52,64],[6,27,34,55,74],[12,23,"FREE",53,68],[9,22,31,47,71],[15,26,40,59,63]] },
+                { num: "162", grilla: [[8,24,42,48,70],[3,18,37,59,69],[11,28,"FREE",51,65],[5,21,33,46,73],[14,30,36,54,62]] }
+            ],
+            "163_168": [
+                { num: "163", grilla: [[11,21,32,59,67],[4,29,39,47,70],[1,18,"FREE",52,65],[8,24,36,54,73],[13,26,40,48,61]] },
+                { num: "164", grilla: [[6,19,34,51,75],[12,27,37,55,62],[15,20,"FREE",50,68],[3,23,43,49,64],[9,25,31,58,72]] },
+                { num: "165", grilla: [[2,22,41,46,69],[7,16,38,53,66],[10,28,"FREE",57,74],[5,20,35,60,63],[14,30,42,49,71]] },
+                { num: "166", grilla: [[13,24,37,53,62],[8,21,32,50,71],[2,27,"FREE",58,69],[11,19,40,46,65],[6,28,34,55,74]] },
+                { num: "167", grilla: [[3,16,39,48,70],[10,23,35,59,67],[14,25,"FREE",51,63],[1,20,42,56,72],[9,26,31,47,66]] },
+                { num: "168", grilla: [[7,25,33,52,75],[12,18,41,54,64],[15,22,"FREE",49,61],[4,29,38,60,68],[5,21,36,46,73]] }
+            ],
+            "169_174": [
+                { num: "169", grilla: [[10,21,36,59,63],[1,29,43,47,68],[13,27,"FREE",52,71],[6,19,31,55,65],[8,24,34,46,74]] },
+                { num: "170", grilla: [[4,26,38,50,72],[12,18,32,57,66],[15,20,"FREE",51,69],[7,23,39,54,61],[11,25,33,48,75]] },
+                { num: "171", grilla: [[2,16,40,54,61],[9,22,37,49,70],[5,28,"FREE",58,73],[14,24,35,46,64],[3,27,41,56,67]] },
+                { num: "172", grilla: [[9,24,34,55,66],[3,19,39,51,75],[13,21,"FREE",53,69],[7,28,32,49,61],[11,26,40,57,63]] },
+                { num: "173", grilla: [[1,27,41,47,70],[15,22,36,58,62],[8,20,"FREE",50,74],[4,23,33,52,65],[10,29,38,59,68]] },
+                { num: "174", grilla: [[6,18,37,56,61],[12,25,43,46,71],[2,26,"FREE",54,67],[5,16,35,60,72],[14,30,32,49,64]] }
+            ],
+            "175_180": [
+                { num: "175", grilla: [[5,21,38,50,73],[11,19,33,57,65],[14,26,"FREE",51,62],[8,27,32,46,70],[3,24,41,55,69]] },
+                { num: "176", grilla: [[10,29,35,49,67],[1,23,40,53,61],[12,20,"FREE",58,74],[6,17,31,56,71],[15,25,42,47,64]] },
+                { num: "177", grilla: [[7,18,36,54,66],[4,25,39,52,72],[13,22,"FREE",46,68],[9,28,37,60,75],[2,21,43,48,63]] },
+                { num: "178", grilla: [[3,27,39,51,64],[12,21,31,56,70],[8,19,"FREE",49,68],[1,24,34,60,72],[15,25,40,57,61]] },
+                { num: "179", grilla: [[6,20,36,46,75],[13,29,38,53,65],[11,26,"FREE",50,62],[7,22,33,59,69],[4,16,42,55,73]] },
+                { num: "180", grilla: [[9,23,32,58,67],[2,18,43,48,61],[14,25,"FREE",52,71],[5,27,35,54,74],[10,21,39,47,63]] }
+            ],
+            "181_186": [
+                { num: "181", grilla: [[12,24,37,52,65],[6,19,41,59,74],[2,22,"FREE",48,68],[10,28,33,46,71],[15,26,31,57,62]] },
+                { num: "182", grilla: [[8,17,35,50,71],[4,27,33,56,69],[13,20,"FREE",54,63],[11,21,38,47,75],[1,25,40,58,66]] },
+                { num: "183", grilla: [[3,29,39,49,63],[9,23,36,51,67],[14,25,"FREE",55,72],[7,16,32,60,70],[5,26,42,46,61]] },
+                { num: "184", grilla: [[10,20,38,56,64],[1,23,31,48,75],[13,26,"FREE",50,67],[7,19,34,57,72],[4,25,41,52,61]] },
+                { num: "185", grilla: [[6,27,32,51,69],[12,22,39,54,62],[15,18,"FREE",59,70],[3,21,36,46,74],[8,29,40,55,63]] },
+                { num: "186", grilla: [[2,16,35,49,73],[9,24,37,58,66],[11,28,"FREE",53,65],[5,20,33,47,71],[14,30,42,51,62]] }
+            ],
+            "187_192": [
+                { num: "187", grilla: [[4,28,34,55,67],[13,21,42,47,71],[1,19,"FREE",59,62],[9,17,38,50,75],[10,23,31,53,64]] },
+                { num: "188", grilla: [[7,20,39,53,69],[2,25,32,51,65],[11,26,"FREE",58,74],[6,18,36,46,61],[15,24,40,54,72]] },
+                { num: "189", grilla: [[5,22,37,49,73],[8,27,35,56,61],[14,20,"FREE",52,66],[3,16,41,60,70],[12,30,33,47,68]] },
+                { num: "190", grilla: [[11,24,35,57,63],[3,19,41,49,72],[15,22,"FREE",54,68],[8,16,33,52,74],[1,28,37,46,65]] },
+                { num: "191", grilla: [[6,29,32,50,66],[10,21,39,56,71],[13,27,"FREE",59,62],[5,17,40,48,75],[2,23,38,51,64]] },
+                { num: "192", grilla: [[8,18,36,55,70],[4,25,34,53,64],[12,20,"FREE",46,69],[7,26,43,47,61],[9,30,31,58,73]] }
+            ],
+            "193_198": [
+                { num: "193", grilla: [[12,23,31,54,62],[2,26,38,47,73],[15,20,"FREE",56,69],[7,19,35,59,65],[4,28,40,50,71]] },
+                { num: "194", grilla: [[9,16,33,59,68],[6,21,42,51,70],[13,24,"FREE",46,62],[3,27,37,52,75],[11,22,34,57,64]] },
+                { num: "195", grilla: [[1,25,36,55,74],[10,18,39,48,61],[11,29,"FREE",53,67],[5,20,32,50,66],[8,23,41,49,72]] },
+                { num: "196", grilla: [[3,21,39,47,71],[12,24,33,58,64],[8,26,"FREE",52,66],[5,17,35,55,69],[10,29,31,49,63]] },
+                { num: "197", grilla: [[7,18,37,53,62],[1,26,42,48,75],[15,20,"FREE",59,67],[9,22,32,46,70],[11,25,34,51,68]] },
+                { num: "198", grilla: [[6,23,38,56,65],[4,19,31,50,73],[13,27,"FREE",57,61],[2,28,36,54,72],[14,30,41,49,66]] }
+            ],
+            "199_204": [
+                { num: "199", grilla: [[5,21,35,46,72],[10,24,40,55,63],[12,26,"FREE",52,69],[2,19,33,59,74],[8,28,37,48,61]] },
+                { num: "200", grilla: [[1,27,39,58,68],[13,16,31,50,70],[11,22,"FREE",53,62],[6,23,36,47,75],[9,25,34,51,65]] },
+                { num: "201", grilla: [[3,20,34,54,61],[7,25,43,49,66],[14,29,"FREE",57,71],[4,18,38,52,64],[15,22,32,46,73]] },
+                { num: "202", grilla: [[12,25,33,57,74],[6,19,35,48,61],[15,23,"FREE",51,65],[1,21,39,53,70],[8,27,31,49,62]] },
+                { num: "203", grilla: [[2,22,42,46,69],[10,28,37,55,71],[13,20,"FREE",54,63],[4,16,32,59,75],[7,24,36,50,66]] },
+                { num: "204", grilla: [[9,27,34,58,67],[5,21,38,52,64],[11,26,"FREE",47,73],[3,17,41,60,72],[14,30,31,49,65]] }
+            ],
+            "205_210": [
+                { num: "205", grilla: [[4,22,39,52,61],[11,16,31,57,72],[13,29,"FREE",48,65],[7,23,34,50,68],[1,25,42,56,74]] },
+                { num: "206", grilla: [[8,28,33,46,75],[2,20,38,53,67],[15,26,"FREE",51,69],[5,19,36,59,62],[10,21,40,54,71]] },
+                { num: "207", grilla: [[6,17,35,55,64],[12,24,41,49,73],[9,27,"FREE",58,70],[3,21,32,47,66],[14,30,37,52,63]] },
+                { num: "208", grilla: [[1,29,38,47,73],[10,23,43,51,62],[12,26,"FREE",59,66],[6,17,31,52,70],[4,21,36,54,69]] },
+                { num: "209", grilla: [[3,24,34,58,61],[7,19,37,53,75],[14,25,"FREE",50,68],[9,16,41,56,65],[2,27,32,46,72]] },
+                { num: "210", grilla: [[5,20,40,49,67],[11,28,35,55,64],[15,22,"FREE",48,71],[8,22,39,57,63],[13,30,33,51,74]] }
+            ],
+            "211_216": [
+                { num: "211", grilla: [[7,18,36,51,65],[2,26,42,49,74],[13,22,"FREE",59,62],[10,16,33,56,71],[4,24,40,50,68]] },
+                { num: "212", grilla: [[12,25,31,57,67],[6,21,39,46,70],[11,29,"FREE",52,64],[3,17,34,55,75],[8,23,38,53,61]] },
+                { num: "213", grilla: [[9,20,34,54,72],[1,23,37,58,63],[15,27,"FREE",48,69],[5,19,41,50,66],[14,30,32,47,71]] },
+                { num: "214", grilla: [[3,21,38,55,71],[11,26,32,48,63],[8,19,"FREE",52,67],[5,24,43,58,74],[10,29,31,46,65]] },
+                { num: "215", grilla: [[6,17,39,50,75],[1,28,34,53,64],[13,20,"FREE",57,69],[9,23,36,49,62],[4,22,41,56,70]] },
+                { num: "216", grilla: [[2,25,37,46,68],[7,24,42,51,66],[14,27,"FREE",54,73],[12,16,33,59,61],[10,30,35,48,72]] }
+            ],
+            "217_222": [
+                { num: "217", grilla: [[11,18,32,56,63],[5,23,43,49,70],[1,25,"FREE",51,74],[9,27,37,58,61],[4,21,34,46,69]] },
+                { num: "218", grilla: [[8,26,41,52,75],[3,20,35,47,66],[12,29,"FREE",55,62],[7,17,38,54,64],[10,24,31,50,68]] },
+                { num: "219", grilla: [[2,22,36,58,67],[10,16,39,50,64],[14,28,"FREE",53,71],[6,25,33,46,73],[13,30,40,49,65]] },
+                { num: "220", grilla: [[6,24,35,48,73],[13,17,32,57,65],[11,21,"FREE",51,61],[2,28,40,54,70],[9,26,37,46,64]] },
+                { num: "221", grilla: [[3,19,41,53,68],[8,23,38,46,72],[15,29,"FREE",55,66],[10,25,31,49,62],[1,27,34,59,74]] },
+                { num: "222", grilla: [[12,26,33,50,61],[5,16,40,58,75],[14,20,"FREE",52,69],[7,22,36,47,63],[4,29,39,54,67]] }
+            ],
+            "223_228": [
+                { num: "223", grilla: [[10,21,39,56,64],[3,27,33,47,71],[1,24,"FREE",52,66],[6,16,35,59,75],[12,29,42,48,62]] },
+                { num: "224", grilla: [[2,23,36,50,69],[8,19,31,53,74],[13,25,"FREE",57,63],[7,28,40,46,61],[11,30,34,55,67]] },
+                { num: "225", grilla: [[5,17,38,55,65],[11,26,43,51,72],[9,22,"FREE",48,68],[4,20,32,54,70],[15,24,37,49,61]] },
+                { num: "226", grilla: [[12,24,34,53,67],[7,16,37,46,70],[10,29,"FREE",58,63],[1,21,41,50,75],[5,25,32,56,61]] },
+                { num: "227", grilla: [[3,20,42,47,73],[9,26,33,59,66],[14,23,"FREE",51,64],[8,18,36,52,69],[11,28,31,55,62]] },
+                { num: "228", grilla: [[6,19,35,55,61],[2,27,39,48,74],[15,21,"FREE",54,68],[4,22,32,50,71],[13,30,40,49,65]] }
+            ],
+            "229_234": [
+                { num: "229", grilla: [[8,23,43,50,62],[1,26,33,48,72],[11,20,"FREE",54,69],[4,17,37,57,65],[15,25,31,46,70]] },
+                { num: "230", grilla: [[5,19,34,58,68],[10,22,39,47,74],[13,29,"FREE",52,63],[7,16,36,51,61],[2,27,41,49,66]] },
+                { num: "231", grilla: [[12,24,35,53,75],[6,21,40,56,67],[14,28,"FREE",49,64],[3,18,32,59,71],[9,25,38,46,62]] },
+                { num: "232", grilla: [[2,21,39,47,65],[11,26,34,51,71],[13,16,"FREE",58,67],[7,19,33,56,73],[9,28,42,46,61]] },
+                { num: "233", grilla: [[8,25,31,55,70],[4,18,37,53,63],[15,20,"FREE",52,69],[6,23,38,48,64],[10,29,40,49,74]] },
+                { num: "234", grilla: [[12,17,36,59,62],[1,24,43,46,68],[10,27,"FREE",57,75],[5,22,32,50,66],[14,30,35,51,71]] }
+            ],
+            "235_240": [
+                { num: "235", grilla: [[7,26,33,51,67],[3,19,38,49,74],[14,23,"FREE",56,61],[9,16,42,54,72],[11,28,35,46,65]] },
+                { num: "236", grilla: [[2,20,31,57,69],[12,25,40,47,63],[11,22,"FREE",52,70],[5,18,36,53,66],[13,29,37,48,75]] },
+                { num: "237", grilla: [[6,24,39,53,71],[1,17,35,55,62],[10,28,"FREE",50,73],[4,21,33,58,64],[15,27,41,46,68]] },
+                { num: "238", grilla: [[13,22,37,50,65],[5,27,42,46,69],[8,16,"FREE",54,72],[11,19,33,58,63],[2,26,31,47,75]] },
+                { num: "239", grilla: [[10,18,34,56,71],[3,24,39,49,66],[12,29,"FREE",51,62],[7,21,35,52,68],[4,25,43,47,74]] },
+                { num: "240", grilla: [[1,23,38,53,67],[6,20,32,59,70],[15,25,"FREE",57,64],[9,16,40,46,73],[14,30,36,48,61]] }
+            ],
+            "241_246": [
+                { num: "241", grilla: [[11,19,34,49,70],[4,26,41,54,63],[12,25,"FREE",58,74],[7,16,37,51,67],[2,22,31,46,61]] },
+                { num: "242", grilla: [[8,23,38,52,65],[1,20,33,57,72],[13,28,"FREE",50,64],[5,17,35,47,69],[15,27,40,48,73]] },
+                { num: "243", grilla: [[3,24,36,55,68],[10,21,39,46,61],[14,29,"FREE",53,75],[6,18,32,59,66],[9,25,42,51,71]] },
+                { num: "244", grilla: [[12,17,40,51,66],[2,26,32,56,73],[9,23,"FREE",48,62],[7,20,38,49,69],[11,28,34,59,71]] },
+                { num: "245", grilla: [[6,24,39,47,75],[1,21,35,53,61],[15,27,"FREE",50,68],[10,16,33,57,64],[4,29,36,52,70]] },
+                { num: "246", grilla: [[8,19,32,55,63],[13,25,41,49,67],[11,28,"FREE",59,72],[3,22,37,46,65],[14,30,43,51,74]] }
+            ],
+            "247_252": [
+                { num: "247", grilla: [[3,20,39,52,65],[9,26,33,48,74],[15,24,"FREE",56,69],[7,18,37,50,63],[1,22,41,47,72]] },
+                { num: "248", grilla: [[10,21,36,58,70],[5,17,40,46,62],[12,29,"FREE",53,67],[2,25,31,51,75],[13,27,34,49,61]] },
+                { num: "249", grilla: [[6,23,35,55,61],[11,16,38,49,73],[14,28,"FREE",51,66],[4,19,32,57,71],[8,24,42,47,64]] },
+                { num: "250", grilla: [[2,18,33,50,69],[12,27,39,54,64],[10,22,"FREE",47,75],[6,21,35,58,62],[15,26,41,46,71]] },
+                { num: "251", grilla: [[9,23,38,55,67],[4,19,31,48,72],[13,25,"FREE",52,61],[7,16,36,59,74],[11,29,43,46,65]] },
+                { num: "252", grilla: [[5,26,34,51,63],[1,20,42,57,69],[8,28,"FREE",49,70],[3,17,37,53,75],[14,30,39,46,62]] }
+            ]
+        };
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const tableroContainer = document.getElementById("tablero-principal");
+            const letras = ['B', 'I', 'N', 'G', 'O'];
+            
+            for (let c = 0; c < 5; c++) {
+                const colDiv = document.createElement("div");
+                colDiv.className = "columna-bingo";
+                const headerLetra = document.createElement("div");
+                headerLetra.className = "letra-bingo";
+                headerLetra.innerText = letras[c];
+                colDiv.appendChild(headerLetra);
+
+                let inicio = c * 15 + 1;
+                let fin = inicio + 15;
+                for (let i = inicio; i < fin; i++) {
+                    const celda = document.createElement("div");
+                    celda.className = "celda-tablero";
+                    celda.innerText = i;
+                    celda.onclick = () => {
+                        reproducirSonido('click');
+                        alternarNumeroCantado(i, celda);
+                    };
+                    elementosTablero[i] = celda;
+                    colDiv.appendChild(celda);
+                }
+                tableroContainer.appendChild(colDiv);
+            }
+
+            cargarDatosLocales();
+            renderizarCreadorModalidad();
+        });
+
+        function abrirModalAdmin() {
+            reproducirSonido('click');
+            document.getElementById("modal-admin").style.display = "flex";
+        }
+
+        function cerrarModalAdmin() {
+            reproducirSonido('click');
+            document.getElementById("modal-admin").style.display = "none";
+        }
+
+        function verificarPasswordAdmin() {
+            let pass = document.getElementById("input-pass-admin").value;
+            if (pass === PASSWORD_ADMIN) {
+                reproducirSonido('marcar');
+                document.getElementById("admin-bloqueado").style.display = "none";
+                document.getElementById("admin-desbloqueado").style.display = "block";
+                document.getElementById("input-pass-admin").value = "";
+            } else {
+                alert("Contraseña incorrecta.");
+            }
+        }
+
+        function validarCartonExpress() {
+            let numStr = document.getElementById("val-num-carton").value.trim();
+            let modSeleccionada = document.getElementById("val-modalidad-select").value;
+            
+            if (!numStr) {
+                alert("Ingresa un número de cartón.");
+                return;
+            }
+
+            let numBusqueda = parseInt(numStr, 10);
+            let cartonEncontrado = null;
+
+            Object.keys(masterCartonesDB).forEach(loteKey => {
+                masterCartonesDB[loteKey].forEach(c => {
+                    if (parseInt(c.num, 10) === numBusqueda) {
+                        cartonEncontrado = c;
+                    }
+                });
+            });
+
+            if (!cartonEncontrado) {
+                alert(`El cartón Nº ${numStr} no existe en la base de datos maestra.`);
+                return;
+            }
+
+            let resultado = evaluarModalidad(cartonEncontrado.grilla, modSeleccionada, numerosCantados);
+            let nombreModText = modalidadesDisponibles[modSeleccionada] ? modalidadesDisponibles[modSeleccionada].nombre : modSeleccionada;
+            let coordsModalidad = obtenerCoordenadasDeModalidad(modSeleccionada, cartonEncontrado.grilla);
+
+            let miniGridModal = '<div class="mini-carton-wrapper" style="max-width: 140px; margin: 4px auto;"><div class="mini-header-bingo"><div class="mini-letra-th">B</div><div class="mini-letra-th">I</div><div class="mini-letra-th">N</div><div class="mini-letra-th">G</div><div class="mini-letra-th">O</div></div><div class="mini-carton-grid">';
+            
+            for (let r = 0; r < 5; r++) {
+                for (let c = 0; c < 5; c++) {
+                    let val = cartonEncontrado.grilla[r][c];
+                    let esDeModalidad = coordsModalidad.some(coord => coord.r === r && coord.c === c);
+                    let estaCantado = (val === "FREE") || numerosCantados.has(parseInt(val, 10));
+
+                    let clase = "mini-celda";
+                    if (val === "FREE") val = "⭐";
+
+                    if (esDeModalidad) {
+                        clase += " modalidad-destacada";
+                        if (estaCantado) clase += " marcada";
+                    } else {
+                        clase += " modalidad-parte";
+                        if (estaCantado) clase += " marcada";
+                    }
+
+                    miniGridModal += `<div class="${clase}">${val}</div>`;
+                }
+            }
+            miniGridModal += '</div></div>';
+
+            const modal = document.getElementById("modal-ganador");
+            let iconoTitulo = document.getElementById("modal-icono-titulo");
+            let tituloTexto = document.getElementById("modal-titulo-texto");
+            let contenidoBox = document.getElementById("contenido-ganador-individual");
+
+            if (resultado.esBingo) {
+                // DISPARAR CONFETI Y SONIDO DE INMEDIATO AL ABRIR EL AVISO
+                reproducirSonido('ganador');
+                lanzarConfetiFestivo();
+                
+                iconoTitulo.innerText = "🏆🥳";
+                tituloTexto.innerText = "¡BINGO VÁLIDO!";
+                tituloTexto.style.color = "#2ecc71";
+                contenidoBox.innerHTML = `
+                    Cartón Nº: <b style="font-size: 1rem; color: #f1c40f;">${cartonEncontrado.num}</b><br>
+                    Modalidad: <b style="color: #38bdf8;">${nombreModText}</b><br>
+                    <span style="color: #2ecc71; font-weight: bold;">✅ Cumple perfectamente con los números cantados.</span>
+                    ${miniGridModal}
+                `;
+            } else {
+                reproducirSonido('click');
+                iconoTitulo.innerText = "❌⚠️";
+                tituloTexto.innerText = "FALSO BINGO";
+                tituloTexto.style.color = "#e74c3c";
+                contenidoBox.innerHTML = `
+                    Cartón Nº: <b style="font-size: 1rem; color: #f1c40f;">${cartonEncontrado.num}</b><br>
+                    Modalidad: <b style="color: #38bdf8;">${nombreModText}</b><br>
+                    <span style="color: #e74c3c; font-weight: bold;">❌ Aún le faltan fichas para completar la figura.</span>
+                    ${miniGridModal}
+                `;
+            }
+
+            modal.style.display = "flex";
+        }
+
+        function obtenerCoordenadasDeModalidad(modKey, grilla) {
+            let coords = [];
+            let modObj = modalidadesDisponibles[modKey];
+
+            if (modObj && modObj.tipo === "personalizada") {
+                for (let r = 0; r < 5; r++) {
+                    for (let c = 0; c < 5; c++) {
+                        if (modObj.patron[r][c]) coords.push({r, c});
+                    }
+                }
+            } else if (modKey === "carton_lleno") {
+                for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) coords.push({r, c});
+            } else if (modKey === "linea") {
+                let mejorFila = 0;
+                let minFaltantes = 99;
+                for (let r = 0; r < 5; r++) {
+                    let faltas = 0;
+                    for (let c = 0; c < 5; c++) {
+                        let val = grilla[r][c];
+                        if (val !== "FREE" && !numerosCantados.has(parseInt(val, 10))) faltas++;
+                    }
+                    if (faltas < minFaltantes) { minFaltantes = faltas; mejorFila = r; }
+                }
+                for (let c = 0; c < 5; c++) {
+                    let faltas = 0;
+                    for (let r = 0; r < 5; r++) {
+                        let val = grilla[r][c];
+                        if (val !== "FREE" && !numerosCantados.has(parseInt(val, 10))) faltas++;
+                    }
+                    if (faltas < minFaltantes) {
+                        for (let r = 0; r < 5; r++) coords.push({r, c});
+                        return coords;
+                    }
+                }
+                for (let c = 0; c < 5; c++) coords.push({r: mejorFila, c});
+            } else if (modKey === "cuatro_esquinas") {
+                coords = [{r:0, c:0}, {r:0, c:4}, {r:4, c:0}, {r:4, c:4}];
+            } else if (modKey === "letra_x") {
+                for (let i = 0; i < 5; i++) {
+                    coords.push({r: i, c: i});
+                    coords.push({r: i, c: 4 - i});
+                }
+            }
+            return coords;
+        }
+
+        function cambiarTema(tema) {
+            reproducirSonido('click');
+            document.body.className = "";
+            if (tema === 'clasico') document.body.classList.add("tema-clasico");
+            if (tema === 'neon') document.body.classList.add("tema-neon");
+            localStorage.setItem("el_profe_binguero_tema", tema);
+        }
+
+        function abrirVistaImpresion() {
+            reproducirSonido('click');
+            if (listaJugadores.length === 0) {
+                alert("No hay cartones registrados para imprimir.");
+                return;
+            }
+            const gridPrint = document.getElementById("print-cards-grid");
+            gridPrint.innerHTML = "";
+
+            listaJugadores.forEach(j => {
+                let cardDiv = document.createElement("div");
+                cardDiv.className = "print-card";
+                
+                let miniGrid = `
+                    <div style="font-weight:bold; font-size:14px; margin-bottom:4px;">Cartón Nº: ${j.numeroCarton} - ${j.nombre}</div>
+                    <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:2px; text-align:center; font-weight:bold;">
+                        <div style="background:#ddd; padding:4px;">B</div><div style="background:#ddd; padding:4px;">I</div><div style="background:#ddd; padding:4px;">N</div><div style="background:#ddd; padding:4px;">G</div><div style="background:#ddd; padding:4px;">O</div>
+                `;
+                for (let r = 0; r < 5; r++) {
+                    for (let c = 0; c < 5; c++) {
+                        let val = j.grilla[r][c];
+                        if (val === "FREE") val = "⭐";
+                        miniGrid += `<div style="border:1px solid #999; padding:6px; font-size:12px;">${val}</div>`;
+                    }
+                }
+                miniGrid += '</div>';
+                cardDiv.innerHTML = miniGrid;
+                gridPrint.appendChild(cardDiv);
+            });
+
+            window.print();
+        }
+
+        function renderizarCreadorModalidad() {
+            const grid = document.getElementById("grid-creador-modalidad");
+            grid.innerHTML = "";
+            for (let r = 0; r < 5; r++) {
+                for (let c = 0; c < 5; c++) {
+                    const celda = document.createElement("div");
+                    celda.className = "celda-creador";
+                    if (r === 2 && c === 2) {
+                        celda.classList.add("centro");
+                        celda.innerText = "⭐";
+                    } else {
+                        if (matrizCreadorModalidad[r][c]) celda.classList.add("seleccionada");
+                        celda.innerText = "•";
+                        celda.onclick = () => {
+                            reproducirSonido('click');
+                            matrizCreadorModalidad[r][c] = !matrizCreadorModalidad[r][c];
+                            renderizarCreadorModalidad();
+                        };
+                    }
+                    grid.appendChild(celda);
+                }
+            }
+        }
+
+        function guardarNuevaModalidad() {
+            reproducirSonido('click');
+            let nombreInput = document.getElementById("input-nombre-nueva-mod").value.trim();
+            if (!nombreInput) {
+                alert("Por favor escribe un nombre para la modalidad.");
+                return;
+            }
+
+            let keyId = "mod_" + Date.now();
+            let patronCopia = matrizCreadorModalidad.map(row => [...row]);
+            patronCopia[2][2] = true;
+
+            modalidadesDisponibles[keyId] = {
+                nombre: nombreInput,
+                tipo: "personalizada",
+                patron: patronCopia
+            };
+
+            document.getElementById("input-nombre-nueva-mod").value = "";
+            matrizCreadorModalidad = [
+                [false, false, false, false, false],
+                [false, false, false, false, false],
+                [false, false, true,  false, false],
+                [false, false, false, false, false],
+                [false, false, false, false, false]
+            ];
+            renderizarCreadorModalidad();
+            renderizarSelectorModalidades();
+            guardarDatosLocales();
+            alert(`¡Modalidad "${nombreInput}" creada y guardada con éxito!`);
+        }
+
+        function cargarCartonIndividual() {
+            reproducirSonido('click');
+            let inputVal = document.getElementById("input-carton-individual").value.trim();
+            let nombreJugadorInput = document.getElementById("input-nombre-jugador-ind").value.trim();
+            if (!inputVal) return;
+
+            let numBusqueda = parseInt(inputVal, 10);
+            if (isNaN(numBusqueda)) {
+                alert("Por favor ingresa un número de cartón válido.");
+                return;
+            }
+            let strBusqueda = numBusqueda < 10 ? "0" + numBusqueda : numBusqueda.toString();
+
+            let cartonEncontrado = null;
+            Object.keys(masterCartonesDB).forEach(loteKey => {
+                masterCartonesDB[loteKey].forEach(c => {
+                    if (parseInt(c.num, 10) === numBusqueda) {
+                        cartonEncontrado = c;
+                    }
+                });
+            });
+
+            if (!cartonEncontrado) {
+                alert(`No se encontró el cartón Nº ${strBusqueda} en la base de datos.`);
+                return;
+            }
+
+            let yaExiste = listaJugadores.some(j => parseInt(j.numeroCarton, 10) === numBusqueda);
+            if (yaExiste) {
+                alert(`El cartón Nº ${strBusqueda} ya está en la lista de cartones registrados.`);
+                return;
+            }
+
+            let modalidadesSeleccionadas = [];
+            document.querySelectorAll('input[name="modalidades-activas"]:checked').forEach(chk => modalidadesSeleccionadas.push(chk.value));
+            if (modalidadesSeleccionadas.length === 0) modalidadesSeleccionadas = ["carton_lleno"];
+
+            let nombreFinal = nombreJugadorInput !== "" ? nombreJugadorInput : "Particular";
+
+            listaJugadores.push({
+                id: Date.now() + Math.random(),
+                nombre: nombreFinal,
+                numeroCarton: cartonEncontrado.num,
+                modalidades: [...modalidadesSeleccionadas],
+                grilla: cartonEncontrado.grilla,
+                activo: true,
+                yaGano: false
+            });
+
+            document.getElementById("input-carton-individual").value = "";
+            document.getElementById("input-nombre-jugador-ind").value = "";
+            guardarDatosLocales();
+            verificarEstadoJuego(true);
+            alert(`¡Cartón Nº ${cartonEncontrado.num} (${nombreFinal}) agregado con éxito!`);
+        }
+
+        function cargarLoteSeleccionado() {
+            reproducirSonido('click');
+            let claveLote = document.getElementById("select-lote").value;
+            let cartonesLote = masterCartonesDB[claveLote];
+            if (!cartonesLote) return;
+
+            let modalidadesSeleccionadas = [];
+            document.querySelectorAll('input[name="modalidades-activas"]:checked').forEach(chk => modalidadesSeleccionadas.push(chk.value));
+            if (modalidadesSeleccionadas.length === 0) modalidadesSeleccionadas = ["carton_lleno"];
+
+            let countNuevos = 0;
+            cartonesLote.forEach(item => {
+                let existe = listaJugadores.some(j => j.numeroCarton.toString() === item.num.toString());
+                if (!existe) {
+                    listaJugadores.push({
+                        id: Date.now() + Math.random() + countNuevos,
+                        nombre: `Lote Profe`,
+                        numeroCarton: item.num,
+                        modalidades: [...modalidadesSeleccionadas],
+                        grilla: item.grilla,
+                        activo: true,
+                        yaGano: false
+                    });
+                    countNuevos++;
+                }
+            });
+
+            guardarDatosLocales();
+            verificarEstadoJuego(true);
+
+            if (countNuevos > 0) {
+                alert(`¡Lote cargado correctamente! Se agregaron ${countNuevos} cartones nuevos.`);
+            } else {
+                alert(`Los cartones de este lote ya se encuentran todos registrados en la sesión.`);
+            }
+        }
+
+        function cargarTodosLosLotes() {
+            reproducirSonido('click');
+            let modalidadesSeleccionadas = [];
+            document.querySelectorAll('input[name="modalidades-activas"]:checked').forEach(chk => modalidadesSeleccionadas.push(chk.value));
+            if (modalidadesSeleccionadas.length === 0) modalidadesSeleccionadas = ["carton_lleno"];
+
+            listaJugadores = [];
+            let countTotal = 0;
+
+            Object.keys(masterCartonesDB).forEach(clave => {
+                masterCartonesDB[clave].forEach(item => {
+                    listaJugadores.push({
+                        id: Date.now() + Math.random() + countTotal,
+                        nombre: `Lote Profe`,
+                        numeroCarton: item.num,
+                        modalidades: [...modalidadesSeleccionadas],
+                        grilla: item.grilla,
+                        activo: true,
+                        yaGano: false
+                    });
+                    countTotal++;
+                });
+            });
+
+            guardarDatosLocales();
+            verificarEstadoJuego(true);
+            alert(`¡Se han cargado todos los lotes de la base de datos con éxito! (${countTotal} cartones)`);
+        }
+
+        function eliminarTodosLosCartones() {
+            reproducirSonido('click');
+            if (listaJugadores.length === 0) {
+                alert("No hay cartones registrados para eliminar.");
+                return;
+            }
+            if (confirm("¿Estás seguro de que deseas eliminar TODOS los cartones registrados?")) {
+                listaJugadores = [];
+                guardarDatosLocales();
+                verificarEstadoJuego(false);
+            }
+        }
+
+        function alternarVoz() {
+            reproducirSonido('click');
+            vozActiva = !vozActiva;
+            const btnVoz = document.getElementById("btn-voz");
+            btnVoz.innerText = vozActiva ? "🔊 Voz: ON" : "🔊 Voz: OFF";
+            btnVoz.classList.toggle("activo", vozActiva);
+        }
+
+        function cantarNumeroVoz(texto) {
+            if (!vozActiva || !('speechSynthesis' in window)) return;
+            window.speechSynthesis.cancel();
+            let utterance = new SpeechSynthesisUtterance(texto);
+            utterance.lang = 'es-ES';
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function obtenerLetraDeNumero(num) {
+            if (num <= 15) return 'B';
+            if (num <= 30) return 'I';
+            if (num <= 45) return 'N';
+            if (num <= 60) return 'G';
+            return 'O';
+        }
+
+        function renderizarSelectorModalidades(modalidadesActivasGuardadas = null) {
+            const contenedor = document.getElementById("contenedor-selector-modalidades");
+            const selectAdmin = document.getElementById("val-modalidad-select");
+            
+            contenedor.innerHTML = "";
+            selectAdmin.innerHTML = "";
+
+            Object.keys(modalidadesDisponibles).forEach(key => {
+                const mod = modalidadesDisponibles[key];
+                
+                const label = document.createElement("label");
+                label.className = "checkbox-label";
+                
+                let marcado = '';
+                if (modalidadesActivasGuardadas) {
+                    marcado = modalidadesActivasGuardadas.includes(key) ? 'checked' : '';
+                } else {
+                    marcado = (key === 'carton_lleno') ? 'checked' : '';
+                }
+
+                label.innerHTML = `<input type="checkbox" name="modalidades-activas" value="${key}" ${marcado} onchange="actualizarModalidadesCartones()"> ${mod.nombre}`;
+                contenedor.appendChild(label);
+
+                const option = document.createElement("option");
+                option.value = key;
+                option.innerText = mod.nombre;
+                selectAdmin.appendChild(option);
+            });
+        }
+
+        function actualizarModalidadesCartones() {
+            reproducirSonido('click');
+            let modalidadesSeleccionadas = [];
+            document.querySelectorAll('input[name="modalidades-activas"]:checked').forEach(chk => modalidadesSeleccionadas.push(chk.value));
+            listaJugadores.forEach(j => { j.modalidades = [...modalidadesSeleccionadas]; j.yaGano = false; });
+            guardarDatosLocales();
+            verificarEstadoJuego(true);
+        }
+
+        function guardarDatosLocales() {
+            let modalidadesSeleccionadas = [];
+            document.querySelectorAll('input[name="modalidades-activas"]:checked').forEach(chk => modalidadesSeleccionadas.push(chk.value));
+
+            const datos = {
+                cantados: Array.from(numerosCantados),
+                historial: historialCantadosArray,
+                jugadores: listaJugadores,
+                historialGanadores: historialGanadoresSesion,
+                modalidadesCustom: modalidadesDisponibles,
+                modalidadesActivas: modalidadesSeleccionadas
+            };
+            localStorage.setItem("el_profe_binguero_data", JSON.stringify(datos));
+        }
+
+        function cargarDatosLocales() {
+            const guardado = localStorage.getItem("el_profe_binguero_data");
+            const temaGuardado = localStorage.getItem("el_profe_binguero_tema");
+            if (temaGuardado) cambiarTema(temaGuardado);
+
+            let modalidadesActivasGuardadas = null;
+
+            if (guardado) {
+                try {
+                    const data = JSON.parse(guardado);
+                    if (data.modalidadesCustom) {
+                        modalidadesDisponibles = data.modalidadesCustom;
+                    }
+                    if (data.modalidadesActivas) {
+                        modalidadesActivasGuardadas = data.modalidadesActivas;
+                    }
+                    if (data.historial) historialCantadosArray = data.historial;
+                    if (data.cantados) {
+                        numerosCantados = new Set(data.cantados);
+                        numerosCantados.forEach(num => { if (elementosTablero[num]) elementosTablero[num].classList.add("cantado"); });
+                        document.getElementById("contador-cantados").innerText = `${numerosCantados.size}/75`;
+                    }
+                    if (data.jugadores) listaJugadores = data.jugadores;
+                    if (data.historialGanadores) {
+                        historialGanadoresSesion = data.historialGanadores;
+                        actualizarHistorialGanadoresUI();
+                    }
+                    actualizarHistorialUI();
+                    verificarEstadoJuego(false);
+                } catch (e) { console.error(e); }
+            }
+            renderizarSelectorModalidades(modalidadesActivasGuardadas);
+        }
+
+        function alternarProyector() {
+            reproducirSonido('click');
+            const body = document.body;
+            const textoBtn = document.getElementById("texto-btn-proyector");
+            body.classList.toggle("modo-proyector");
+            textoBtn.innerText = body.classList.contains("modo-proyector") ? "Salir" : "Proyector";
+            window.scrollTo(0, 0);
+        }
+
+        function reiniciarTablero() {
+            reproducirSonido('click');
+            if (confirm("¿Reiniciar el tablero?")) {
+                numerosCantados.clear();
+                historialCantadosArray = [];
+                colaGanadoresPendientes = [];
+                for (let num = 1; num <= 75; num++) {
+                    if (elementosTablero[num]) elementosTablero[num].classList.remove("cantado", "falta-tablero");
+                }
+                document.getElementById("contador-cantados").innerText = "0/75";
+                actualizarHistorialUI();
+                listaJugadores.forEach(j => { j.yaGano = false; j.leFaltaUno = false; });
+                guardarDatosLocales();
+                actualizarInterfazJugadores();
+            }
+        }
+
+        function eliminarCarton(id) {
+            reproducirSonido('click');
+            listaJugadores = listaJugadores.filter(j => j.id !== id);
+            guardarDatosLocales();
+            verificarEstadoJuego(false);
+        }
+
+        function alternarEstadoCarton(id) {
+            reproducirSonido('click');
+            const j = listaJugadores.find(item => item.id === id);
+            if (j) { j.activo = !j.activo; guardarDatosLocales(); verificarEstadoJuego(false); }
+        }
+
+        function alternarNumeroCantado(num, elemento) {
+            let letra = obtenerLetraDeNumero(num);
+            if (numerosCantados.has(num)) {
+                numerosCantados.delete(num);
+                elemento.classList.remove("cantado");
+                historialCantadosArray = historialCantadosArray.filter(n => n !== num);
+            } else {
+                numerosCantados.add(num);
+                elemento.classList.add("cantado");
+                historialCantadosArray = historialCantadosArray.filter(n => n !== num);
+                historialCantadosArray.unshift(num);
+                reproducirSonido('marcar');
+                cantarNumeroVoz(`${letra}, ${num}`);
+            }
+            document.getElementById("contador-cantados").innerText = `${numerosCantados.size}/75`;
+            actualizarHistorialUI();
+            guardarDatosLocales();
+            verificarEstadoJuego(true);
+        }
+
+        function actualizarHistorialUI() {
+            const container = document.getElementById("historial-bolas-container");
+            if (historialCantadosArray.length === 0) {
+                container.innerHTML = `<span style="font-size: 0.5rem; color: #9ca3af; padding-top: 3px;">Sin cantar</span>`;
+                return;
+            }
+            container.innerHTML = "";
+            historialCantadosArray.slice(0, 5).forEach((num, index) => {
+                const bola = document.createElement("div");
+                bola.className = `bola-historial-item ${index === 0 ? 'ultima' : ''}`;
+                bola.innerText = `${obtenerLetraDeNumero(num)}${num}`;
+                container.appendChild(bola);
+            });
+        }
+
+        function verificarEstadoJuego(lanzarAvisos = true) {
+            let numerosFaltantesGlobales = new Set();
+            let detalleAPiqueGlobal = [];
+
+            for (let num = 1; num <= 75; num++) {
+                if (elementosTablero[num]) elementosTablero[num].classList.remove("falta-tablero");
+            }
+
+            listaJugadores.forEach(jugador => {
+                if (!jugador.activo) return;
+                let modalidadesGanadas = [];
+                let necesitaUnoGlobal = false;
+
+                let modsAChequear = (jugador.modalidades && jugador.modalidades.length > 0) ? jugador.modalidades : ["carton_lleno"];
+
+                modsAChequear.forEach(modKey => {
+                    let ev = evaluarModalidad(jugador.grilla, modKey, numerosCantados);
+                    if (ev.esBingo) modalidadesGanadas.push(modKey);
+                    if (ev.leFaltaUno) {
+                        necesitaUnoGlobal = true;
+                        ev.numerosFaltantes.forEach(n => {
+                            detalleAPiqueGlobal.push({ nombre: jugador.nombre, carton: jugador.numeroCarton, modalidad: modKey, ficha: n });
+                            numerosFaltantesGlobales.add(n);
+                        });
+                    }
+                });
+
+                if (modalidadesGanadas.length > 0 && !jugador.yaGano) {
+                    jugador.yaGano = true;
+                    if (lanzarAvisos) {
+                        let nombresMods = modalidadesGanadas.map(m => modalidadesDisponibles[m] ? modalidadesDisponibles[m].nombre : m).join(", ");
+                        historialGanadoresSesion.unshift({
+                            nombre: jugador.nombre,
+                            carton: jugador.numeroCarton,
+                            modalidad: nombresMods,
+                            hora: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                        });
+                        actualizarHistorialGanadoresUI();
+
+                        colaGanadoresPendientes.push({ carton: jugador.numeroCarton, nombre: jugador.nombre, grilla: jugador.grilla, mods: modalidadesGanadas });
+                        cantarNumeroVoz(`¡Bingo del cartón ${jugador.numeroCarton}, de ${jugador.nombre}!`);
+                    }
+                } else if (modalidadesGanadas.length === 0) {
+                    jugador.yaGano = false;
+                }
+                jugador.leFaltaUno = necesitaUnoGlobal;
+            });
+
+            numerosFaltantesGlobales.forEach(num => {
+                let celda = elementosTablero[num];
+                if (celda && !numerosCantados.has(num)) {
+                    celda.classList.add("falta-tablero");
+                }
+            });
+
+            actualizarInterfazJugadores();
+            actualizarPanelAPique(detalleAPiqueGlobal);
+            guardarDatosLocales();
+
+            if (colaGanadoresPendientes.length > 0 && lanzarAvisos) {
+                const modal = document.getElementById("modal-ganador");
+                if (modal.style.display !== "flex") mostrarSiguienteGanadorModal();
+            }
+        }
+
+        function actualizarHistorialGanadoresUI() {
+            const contenedor = document.getElementById("lista-historial-ganadores-sesion");
+            if (historialGanadoresSesion.length === 0) {
+                contenedor.innerHTML = `<div style="text-align: center; color: #9ca3af; padding: 4px;">Aún no hay ganadores en esta sesión.</div>`;
+                return;
+            }
+            contenedor.innerHTML = "";
+            historialGanadoresSesion.forEach(g => {
+                let div = document.createElement("div");
+                div.className = "item-hist-sesion";
+                div.innerHTML = `🏆 [${g.hora}] <b>${g.nombre}</b> (Cartón #${g.carton}) - <span style="color:var(--accent-color);">${g.modalidad}</span>`;
+                contenedor.appendChild(div);
+            });
+        }
+
+        function actualizarPanelAPique(listaPique) {
+            const contenedor = document.getElementById("lista-a-pique-container");
+            if (listaPique.length === 0) {
+                contenedor.innerHTML = `<div style="font-size: 0.55rem; color: #9ca3af; text-align: center;">Ninguno a pique.</div>`;
+                return;
+            }
+            contenedor.innerHTML = "";
+            listaPique.forEach(item => {
+                const div = document.createElement("div");
+                div.className = "item-a-pique";
+                div.innerHTML = `🎫 <b>Cartón #${item.carton}</b> (${item.nombre}) ➔ Ficha: <b style="color:#f1c40f;">#${item.ficha}</b>`;
+                contenedor.appendChild(div);
+            });
+        }
+
+        function mostrarSiguienteGanadorModal() {
+            const modal = document.getElementById("modal-ganador");
+            if (colaGanadoresPendientes.length === 0) { modal.style.display = "none"; return; }
+            let ganad = colaGanadoresPendientes.shift();
+
+            // DISPARAR CONFETI Y SONIDO DE INMEDIATO AL ABRIR EL AVISO
+            reproducirSonido('ganador');
+            lanzarConfetiFestivo();
+
+            let nombresMods = ganad.mods.map(m => modalidadesDisponibles[m] ? modalidadesDisponibles[m].nombre : m).join(", ");
+            document.getElementById("modal-icono-titulo").innerText = "🏆🥳";
+            let titulo = document.getElementById("modal-titulo-texto");
+            titulo.innerText = "¡B I N G O !";
+            titulo.style.color = "#f1c40f";
+
+            let miniGridModal = '<div class="mini-carton-wrapper" style="max-width: 140px; margin: 4px auto;"><div class="mini-header-bingo"><div class="mini-letra-th">B</div><div class="mini-letra-th">I</div><div class="mini-letra-th">N</div><div class="mini-letra-th">G</div><div class="mini-letra-th">O</div></div><div class="mini-carton-grid">';
+            for (let r = 0; r < 5; r++) {
+                for (let c = 0; c < 5; c++) {
+                    let val = ganad.grilla[r][c];
+                    let clase = "mini-celda";
+                    if (val === "FREE") { clase += " libre"; val = "⭐"; }
+                    else if (numerosCantados.has(parseInt(val, 10))) { clase += " marcada"; }
+                    miniGridModal += `<div class="${clase}">${val}</div>`;
+                }
+            }
+            miniGridModal += '</div></div>';
+
+            document.getElementById("contenido-ganador-individual").innerHTML = `
+                👤 Jugador: <b style="color: #2ecc71;">${ganad.nombre}</b><br>
+                🎫 Cartón Nº: <b style="font-size: 1rem; color: #f1c40f;">${ganad.carton}</b><br>
+                ⭐ Modalidad: <b style="color: #38bdf8;">${nombresMods}</b>
+                ${miniGridModal}
+            `;
+            modal.style.display = "flex";
+        }
+
+        function cerrarModalGanador() {
+            reproducirSonido('click');
+            document.getElementById("modal-ganador").style.display = "none";
+            setTimeout(() => { if (colaGanadoresPendientes.length > 0) mostrarSiguienteGanadorModal(); }, 200);
+        }
+
+        function evaluarModalidad(grilla, modKey, cantados) {
+            const obtenerFaltantes = (coords) => {
+                let noMarcados = [];
+                coords.forEach(pos => {
+                    let val = grilla[pos.r][pos.c];
+                    if (val !== "FREE" && val !== "" && val !== 0) {
+                        let estaCantado = Array.from(cantados).some(c => parseInt(c, 10) === parseInt(val, 10));
+                        if (!estaCantado) noMarcados.push(parseInt(val, 10));
+                    }
+                });
+                return noMarcados;
+            };
+
+            let modObj = modalidadesDisponibles[modKey];
+            if (modObj && modObj.tipo === "personalizada") {
+                let coords = [];
+                for (let r = 0; r < 5; r++) {
+                    for (let c = 0; c < 5; c++) {
+                        if (modObj.patron[r][c]) coords.push({r, c});
+                    }
+                }
+                let noMarcados = obtenerFaltantes(coords);
+                return { esBingo: noMarcados.length === 0, leFaltaUno: noMarcados.length === 1, numerosFaltantes: noMarcados };
+            }
+
+            if (modKey === "carton_lleno") {
+                let coords = [];
+                for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) coords.push({r, c});
+                let noMarcados = obtenerFaltantes(coords);
+                return { esBingo: noMarcados.length === 0, leFaltaUno: noMarcados.length === 1, numerosFaltantes: noMarcados };
+            } else if (modKey === "linea") {
+                let lineasCompletas = 0;
+                let faltantesLinea = [];
+                for (let r = 0; r < 5; r++) {
+                    let coords = []; for (let c = 0; c < 5; c++) coords.push({r, c});
+                    let faltas = obtenerFaltantes(coords);
+                    if (faltas.length === 0) lineasCompletas++;
+                    if (faltas.length === 1) faltantesLinea.push(faltas[0]);
+                }
+                for (let c = 0; c < 5; c++) {
+                    let coords = []; for (let r = 0; r < 5; r++) coords.push({r, c});
+                    let faltas = obtenerFaltantes(coords);
+                    if (faltas.length === 0) lineasCompletas++;
+                    if (faltas.length === 1) faltantesLinea.push(faltas[0]);
+                }
+                return { esBingo: lineasCompletas > 0, leFaltaUno: lineasCompletas === 0 && faltantesLinea.length > 0, numerosFaltantes: [...new Set(faltantesLinea)] };
+            } else if (modKey === "cuatro_esquinas") {
+                let coords = [{r:0, c:0}, {r:0, c:4}, {r:4, c:0}, {r:4, c:4}];
+                let noMarcados = obtenerFaltantes(coords);
+                return { esBingo: noMarcados.length === 0, leFaltaUno: noMarcados.length === 1, numerosFaltantes: noMarcados };
+            } else if (modKey === "letra_x") {
+                let coords = [];
+                for (let i = 0; i < 5; i++) {
+                    coords.push({r: i, c: i});
+                    coords.push({r: i, c: 4 - i});
+                }
+                let noMarcados = obtenerFaltantes(coords);
+                return { esBingo: noMarcados.length === 0, leFaltaUno: noMarcados.length === 1, numerosFaltantes: noMarcados };
+            }
+            return { esBingo: false, leFaltaUno: false, numerosFaltantes: [] };
+        }
+
+        function actualizarInterfazJugadores() {
+            const contenedor = document.getElementById("lista-cartones-activos");
+            const filtro = document.getElementById("buscador-carton").value.toLowerCase().trim();
+            let filtrados = listaJugadores.filter(j => 
+                j.numeroCarton.toString().toLowerCase().includes(filtro) || 
+                j.nombre.toLowerCase().includes(filtro)
+            );
+
+            if (filtrados.length === 0) {
+                contenedor.innerHTML = `<p style="font-size: 0.65rem; color: #9ca3af; text-align: center; width: 100%;">Sin cartones.</p>`;
+                return;
+            }
+
+            contenedor.innerHTML = "";
+            filtrados.forEach(j => {
+                const card = document.createElement("div");
+                card.className = `card-carton-activo ${j.activo ? '' : 'inactivo'}`;
+                
+                let miniGrid = `
+                    <div class="mini-carton-wrapper">
+                        <div class="mini-header-bingo">
+                            <div class="mini-letra-th">B</div>
+                            <div class="mini-letra-th">I</div>
+                            <div class="mini-letra-th">N</div>
+                            <div class="mini-letra-th">G</div>
+                            <div class="mini-letra-th">O</div>
+                        </div>
+                        <div class="mini-carton-grid">
+                `;
+                for (let r = 0; r < 5; r++) {
+                    for (let c = 0; c < 5; c++) {
+                        let val = j.grilla[r][c];
+                        let clase = "mini-celda";
+                        if (val === "FREE") { clase += " libre"; val = "⭐"; }
+                        else if (numerosCantados.has(parseInt(val, 10))) { clase += " marcada"; }
+                        miniGrid += `<div class="${clase}">${val}</div>`;
+                    }
+                }
+                miniGrid += '</div></div>';
+
+                card.innerHTML = `
+                    <button class="btn-estado-carton" onclick="alternarEstadoCarton(${j.id})">${j.activo ? '⏸️' : '▶️'}</button>
+                    <button class="btn-eliminar-carton" onclick="eliminarCarton(${j.id})">✕</button>
+                    <div style="font-size: 0.65rem; color: var(--accent-color); font-weight: bold; margin-bottom: 2px;">Cartón Nº: ${j.numeroCarton} | <span style="color: #f39c12;">${j.nombre}</span></div>
+                    ${miniGrid}
+                    ${j.yaGano ? '<span class="etiqueta-ganador">🏆 ¡BINGO!</span>' : (j.leFaltaUno ? '<span class="etiqueta-aviso">⚡ ¡FALTA 1!</span>' : '')}
+                `;
+                contenedor.appendChild(card);
+            });
+        }
+    </script>
+</body>
+</html>

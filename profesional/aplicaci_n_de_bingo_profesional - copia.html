@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplicación de Bingo Profesional - Conectada a Firebase</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                }
+            }
+        }
+    </script>
+    <style>
+        .bingo-cell-marked {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+            color: white !important;
+            border-color: #b91c1c !important;
+            transform: scale(0.95);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .master-cell-marked {
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important;
+            color: white !important;
+            border-color: #4338ca !important;
+            box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);
+        }
+        .master-cell-pending-emerald {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+            color: white !important;
+            border-color: #34d399 !important;
+            box-shadow: 0 0 12px rgba(52, 211, 153, 0.8), inset 0 0 6px rgba(255,255,255,0.4);
+            animation: pulse-emerald 1.5s infinite;
+        }
+        .master-cell-pending-blue {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+            color: white !important;
+            border-color: #60a5fa !important;
+            box-shadow: 0 0 12px rgba(96, 165, 250, 0.8), inset 0 0 6px rgba(255,255,255,0.4);
+            animation: pulse-blue 1.5s infinite;
+        }
+        @keyframes pulse-emerald {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 8px rgba(52, 211, 153, 0.6); }
+            50% { transform: scale(1.06); box-shadow: 0 0 16px rgba(52, 211, 153, 1); }
+        }
+        @keyframes pulse-blue {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 8px rgba(96, 165, 250, 0.6); }
+            50% { transform: scale(1.06); box-shadow: 0 0 16px rgba(96, 165, 250, 1); }
+        }
+    </style>
+
+<!-- Firebase SDKs y Conexión Dinámica -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "TU_API_KEY",
+            authDomain: "bingo-de-yois.firebaseapp.com",
+            databaseURL: "https://bingo-de-yois-default-rtdb.firebaseio.com",
+            projectId: "bingo-de-yois",
+            storageBucket: "bingo-de-yois.appspot.com",
+            messagingSenderId: "TU_MESSAGING_SENDER_ID",
+            appId: "TU_APP_ID"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        window.allAvailableCards = [];
+
+        async function cargarCartonesDesdeFirebase() {
+            try {
+                const dbRef = ref(db);
+                const snapshot = await get(dbRef);
+                
+                if (snapshot.exists()) {
+                    const datosCompletos = snapshot.val();
+                    const datos = datosCompletos.cartones || datosCompletos;
+                    
+                    let cartonesCargados = [];
+                    let idGlobalContador = 1;
+
+                    Object.keys(datos).forEach(nombreColorKey => {
+                        let nodoColor = datos[nombreColorKey];
+                        if (!nodoColor || typeof nodoColor !== 'object') return;
+
+                        let nombreBonito = nombreColorKey.charAt(0).toUpperCase() + nombreColorKey.slice(1);
+                        
+                        let temaCss = 'indigo';
+                        let lowerColor = nombreColorKey.toLowerCase();
+                        if (lowerColor.includes('azul')) temaCss = 'blue';
+                        else if (lowerColor.includes('rosado') || lowerColor.includes('magenta') || lowerColor.includes('rosa')) temaCss = 'rose';
+                        else if (lowerColor.includes('morado') || lowerColor.includes('violeta')) temaCss = 'purple';
+                        else if (lowerColor.includes('verde')) temaCss = 'emerald';
+
+                        let contadorColorLocal = 1;
+
+                        const extraerDeNodo = (nodoActual, subNombreLote) => {
+                            if (!nodoActual || typeof nodoActual !== 'object') return;
+
+                            let keys = Object.keys(nodoActual);
+                            let esContenedorDeCartones = keys.some(k => !isNaN(k) && typeof nodoActual[k] === 'object' && nodoActual[k] !== null);
+
+                            if (esContenedorDeCartones) {
+                                keys.forEach(keyCarton => {
+                                    if (isNaN(keyCarton)) return;
+                                    let cartonContainer = nodoActual[keyCarton];
+                                    if (!cartonContainer || typeof cartonContainer !== 'object') return;
+
+                                    let colsFinales = null;
+                                    let idCartonFinal = cartonContainer.carton_id;
+
+                                    // Si el contenedor tiene 'columns' directamente, es este
+                                    if (cartonContainer.columns) {
+                                        colsFinales = cartonContainer.columns;
+                                    } else {
+                                        // Si tiene múltiples subelementos (los dos cartones en uno), 
+                                        // seleccionamos estrictamente EL PRIMERO (ej. la primera key o subclave)
+                                        let subKeys = Object.keys(cartonContainer).filter(sk => {
+                                            let hijo = cartonContainer[sk];
+                                            return hijo && typeof hijo === 'object' && (hijo.columns || hijo.B || hijo.carton_id);
+                                        });
+
+                                        if (subKeys.length > 0) {
+                                            // Tomamos únicamente el primer elemento del inicio de la estructura doble
+                                            let primerSubCarton = cartonContainer[subKeys[0]];
+                                            colsFinales = primerSubCarton.columns || primerSubCarton;
+                                            idCartonFinal = primerSubCarton.carton_id || cartonContainer.carton_id || keyCarton;
+                                        } else {
+                                            colsFinales = cartonContainer;
+                                        }
+                                    }
+
+                                    if (colsFinales && typeof colsFinales === 'object') {
+                                        let matrizFinal = Array(5).fill(0).map(() => Array(5).fill(0));
+
+                                        const obtenerColumna = (letra) => {
+                                            let colObj = colsFinales[letra] || colsFinales[letra.toLowerCase()] || colsFinales[letra.toUpperCase()];
+                                            if (!colObj) return [0, 0, 0, 0, 0];
+                                            let arr = [0, 0, 0, 0, 0];
+                                            for (let i = 0; i < 5; i++) {
+                                                let val = colObj[i] !== undefined ? colObj[i] : colObj[String(i)];
+                                                arr[i] = (val === "FREE" || val === 0) ? val : (parseInt(val) || 0);
+                                            }
+                                            return arr;
+                                        };
+
+                                        let bArr = obtenerColumna('B');
+                                        let iArr = obtenerColumna('I');
+                                        let nArr = obtenerColumna('N');
+                                        let gArr = obtenerColumna('G');
+                                        let oArr = obtenerColumna('O');
+
+                                        for (let r = 0; r < 5; r++) {
+                                            matrizFinal[r][0] = bArr[r];
+                                            matrizFinal[r][1] = iArr[r];
+                                            matrizFinal[r][2] = nArr[r];
+                                            matrizFinal[r][3] = gArr[r];
+                                            matrizFinal[r][4] = oArr[r];
+                                        }
+                                        matrizFinal[2][2] = "FREE";
+
+                                        let numeroVisual = contadorColorLocal++;
+                                        let idUnicoGlobal = idGlobalContador++;
+
+                                        cartonesCargados.push({
+                                            id: idUnicoGlobal,
+                                            title: idCartonFinal ? `Cartón #${idCartonFinal}` : `Cartón #${numeroVisual}`,
+                                            batch: subNombreLote,
+                                            color: temaCss,
+                                            numbers: matrizFinal
+                                        });
+                                    }
+                                });
+                            } else {
+                                keys.forEach(subKey => {
+                                    extraerDeNodo(nodoActual[subKey], `${subNombreLote} - ${subKey}`);
+                                });
+                            }
+                        };
+
+                        extraerDeNodo(nodoColor, nombreBonito);
+                    });
+
+                    if (cartonesCargados.length > 0) {
+                        window.allAvailableCards = cartonesCargados;
+                        selectedCardsIds = [];
+                        
+                        if (typeof initMasterBoardColumns === 'function') initMasterBoardColumns();
+                        if (typeof buildCardSelectorModalList === 'function') buildCardSelectorModalList();
+                        if (typeof initModalitiesList === 'function') initModalitiesList();
+                        if (typeof initActiveCards === 'function') initActiveCards();
+                        if (typeof initCustomDrawGrid === 'function') initCustomDrawGrid();
+                        if (typeof updateMasterBoardPendingHighlights === 'function') updateMasterBoardPendingHighlights();
+                        
+                        console.log("¡Carga exacta de 150 cartones por lote completada! Total cargados:", cartonesCargados.length);
+                    }
+                }
+            } catch (error) {
+                console.error("Error al cargar cartones:", error);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (typeof initMasterBoardColumns === 'function') initMasterBoardColumns();
+            if (typeof initCustomDrawGrid === 'function') initCustomDrawGrid();
+            cargarCartonesDesdeFirebase();
+        });
+    </script>
+</head>
+<body class="bg-slate-900 text-slate-100 h-full flex flex-col font-sans overflow-x-hidden">
+
+    <!-- Header -->
+    <header class="bg-slate-800 border-b border-slate-700 px-6 py-3 flex flex-wrap justify-between items-center shadow-lg">
+        <div class="flex items-center space-x-3">
+            <div class="bg-gradient-to-tr from-indigo-600 to-violet-500 p-2 rounded-xl shadow-md text-white">
+                <i class="fa-solid fa-ticket text-lg"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                    Bingo Profesional (Firebase)
+                    <span class="text-xs bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded-full font-medium">Cloud</span>
+                </h1>
+                <p class="text-[11px] text-slate-400">Control maestro sincronizado con Firebase Realtime Database</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2.5 mt-2 sm:mt-0">
+            <button onclick="openCardSelectorModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-2 shadow-sm">
+                <i class="fa-solid fa-sliders"></i> Selector de Cartones
+            </button>
+            <button onclick="downloadApp()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3.5 py-2 rounded-xl text-xs font-semibold transition border border-slate-600 flex items-center gap-2">
+                <i class="fa-solid fa-download text-indigo-400"></i> Descargar App
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-5 grid grid-cols-1 lg:grid-cols-12 gap-5 overflow-y-auto">
+        
+        <!-- Left Panel: Controls & Master B-I-N-G-O Board -->
+        <section class="lg:col-span-5 flex flex-col gap-4">
+            
+            <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-xl overflow-hidden p-3.5 flex flex-col gap-2.5">
+                <div class="bg-slate-900 border border-indigo-500/30 rounded-xl p-2.5 shadow-inner">
+                    <div class="flex justify-between items-center mb-1.5">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
+                            <i class="fa-solid fa-crosshairs"></i> Figuras Buscadas Activas:
+                        </span>
+                    </div>
+                    <div id="active-modalities-preview-bar" class="flex flex-wrap gap-1.5"></div>
+                </div>
+
+                <details class="group border border-slate-700/80 rounded-xl overflow-hidden bg-slate-900/50">
+                    <summary class="p-2.5 bg-slate-800 hover:bg-slate-700/50 cursor-pointer flex items-center justify-between transition select-none list-none">
+                        <div class="flex items-center gap-2">
+                            <span class="bg-indigo-500/20 text-indigo-400 p-1.5 rounded-lg border border-indigo-500/30">
+                                <i class="fa-solid fa-sliders text-xs"></i>
+                            </span>
+                            <span class="text-xs font-bold uppercase tracking-wider text-white">Configurar Modalidades</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span id="mode-theme-badge" class="text-[10px] px-2 py-0.5 rounded font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Tema Activo</span>
+                            <i class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform duration-200 group-open:rotate-180"></i>
+                        </div>
+                    </summary>
+
+                    <div class="p-2.5 border-t border-slate-700/60 bg-slate-900/80 flex flex-col gap-2.5">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-semibold text-slate-300">Seleccionar Patrones:</span>
+                            <button onclick="openCustomPatternModal()" class="text-[10px] bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/40 px-2 py-1 rounded-lg font-semibold transition flex items-center gap-1">
+                                <i class="fa-solid fa-plus"></i> Crear Personalizado
+                            </button>
+                        </div>
+                        <div id="modalities-checkbox-container" class="bg-slate-950 border border-slate-800 rounded-xl p-2 max-h-36 overflow-y-auto space-y-1.5"></div>
+                    </div>
+                </details>
+            </div>
+
+            <!-- Master Board -->
+            <div class="bg-slate-800 border border-slate-700 rounded-2xl p-3.5 shadow-xl flex flex-col">
+                <div class="flex justify-between items-center mb-2.5">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                        <i class="fa-solid fa-table-cells text-indigo-400"></i> Tablero Maestro
+                    </h3>
+                    <div class="flex items-center gap-2">
+                        <span id="drawn-count-badge" class="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full font-semibold">0 cantados</span>
+                        <button onclick="resetGame()" class="bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition flex items-center gap-1.5" title="Reiniciar tablero y juego">
+                            <i class="fa-solid fa-rotate-right"></i> Reiniciar
+                        </button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-5 gap-1.5" id="master-board-columns"></div>
+            </div>
+        </section>
+
+        <!-- Right Panel: Active Player Cards -->
+        <section class="lg:col-span-7 flex flex-col gap-4">
+            
+            <div class="bg-slate-800 border border-slate-700 rounded-2xl p-3.5 shadow-xl flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <span class="bg-indigo-500/10 text-indigo-400 p-2.5 rounded-xl border border-indigo-500/20">
+                        <i class="fa-solid fa-layer-group text-base"></i>
+                    </span>
+                    <div>
+                        <h2 class="font-bold text-sm text-white">Cartones Activos en Mesa</h2>
+                        <p class="text-xs text-slate-400" id="active-cards-subtitle">Sincronizados desde Firebase</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <label class="flex items-center gap-2 cursor-pointer bg-slate-700/50 hover:bg-slate-700 px-3 py-1.5 rounded-xl text-xs select-none transition border border-slate-600">
+                        <input type="checkbox" id="auto-mark-toggle" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 bg-slate-900 border-slate-600" checked>
+                        <span class="font-medium text-slate-200">Marcado Automático</span>
+                    </label>
+                    <button onclick="clearAllMarks()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 p-2 rounded-xl text-xs transition border border-slate-600" title="Limpiar marcas">
+                        <i class="fa-solid fa-eraser"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="active-cards-container"></div>
+        </section>
+    </main>
+
+    <!-- Modal: Card Selector -->
+    <div id="card-selector-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-indigo-500/40 rounded-3xl p-6 md:p-8 max-w-3xl w-full shadow-2xl flex flex-col max-h-[90vh]">
+            <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-700">
+                <div>
+                    <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-palette text-indigo-400"></i> Selector de Cartones de Firebase
+                    </h3>
+                    <p class="text-xs text-slate-400">Selecciona los cartones que deseas llevar a la mesa de juego</p>
+                </div>
+                <button onclick="closeCardSelectorModal()" class="text-slate-400 hover:text-white p-2">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+                <div class="flex gap-2">
+                    <button onclick="selectAllCards(true)" class="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold transition">
+                        <i class="fa-solid fa-check-double mr-1"></i> Seleccionar Todos
+                    </button>
+                    <button onclick="selectAllCards(false)" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1.5 rounded-xl text-xs font-semibold transition">
+                        <i class="fa-solid fa-rotate-left mr-1"></i> Desmarcar Todos
+                    </button>
+                </div>
+                <div class="w-full sm:w-64">
+                    <input type="text" id="card-search-input" oninput="filterCardSelector()" placeholder="Buscar cartón..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto space-y-4 pr-2" id="selector-cards-list"></div>
+
+            <div class="mt-6 pt-4 border-t border-slate-700 flex justify-end gap-3">
+                <button onclick="applyCardSelection()" class="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold py-3 px-6 rounded-xl shadow-lg transition">
+                    Guardar Selección y Jugar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Custom Pattern Creator -->
+    <div id="custom-pattern-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-indigo-500/40 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl flex flex-col">
+            <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-700">
+                <div>
+                    <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-pen-nib text-indigo-400"></i> Creador de Patrón
+                    </h3>
+                    <p class="text-xs text-slate-400">Diseña tu figura ganadora</p>
+                </div>
+                <button onclick="closeCustomPatternModal()" class="text-slate-400 hover:text-white p-2">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Nombre de la Modalidad:</label>
+                <input type="text" id="custom-pattern-name" placeholder="Ej. La Letra X" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+            </div>
+
+            <div class="flex flex-col items-center justify-center mb-6">
+                <span class="text-[11px] text-slate-400 mb-2">Cuadrícula 5x5</span>
+                <div id="custom-draw-grid" class="grid grid-cols-5 gap-1.5 bg-slate-950 p-2.5 rounded-2xl border border-slate-700"></div>
+            </div>
+
+            <div class="flex gap-3">
+                <button onclick="clearCustomDrawGrid()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold py-3 px-4 rounded-xl text-xs transition">Limpiar</button>
+                <button onclick="saveCustomPattern()" class="flex-1 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold py-3 px-4 rounded-xl text-xs shadow-lg transition">Guardar y Activar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Win Modal Popup -->
+    <div id="win-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-emerald-500/50 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl text-center relative overflow-hidden">
+            <div class="w-20 h-20 bg-gradient-to-tr from-emerald-500 to-teal-400 rounded-2xl mx-auto flex items-center justify-center text-white text-3xl shadow-lg shadow-emerald-500/30 mb-5">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+            <h3 class="text-2xl font-black text-white mb-2" id="win-title">¡BINGO CANTADO!</h3>
+            <p class="text-slate-300 text-sm mb-5" id="win-description">El cartón ha completado con éxito la figura.</p>
+            <div class="bg-slate-900/90 border border-emerald-500/30 rounded-2xl p-4 mb-6 text-left shadow-inner">
+                <div class="text-[11px] text-emerald-400 font-bold mb-1 tracking-wider uppercase">DETALLES:</div>
+                <div id="win-details" class="text-white font-bold text-sm leading-relaxed">Cartón #1</div>
+            </div>
+            <button onclick="closeWinModal()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 px-6 rounded-xl shadow-lg transition">Continuar Partida</button>
+        </div>
+    </div>
+
+    <!-- Script de Lógica del Juego -->
+    <script>
+        let selectedCardsIds = [];
+        let cardStates = {}; 
+        let masterMarkedNumbers = new Set();
+        let cardMarks = {}; 
+        let alreadyDeclaredWins = new Set();
+
+        let gameModes = {
+            line: { name: "Línea", desc: "Cualquier línea completa.", isCellInPattern: (r, c) => false, active: false },
+            corners: { name: "Cuatro Esquinas", desc: "Las 4 esquinas.", isCellInPattern: (r, c) => (r === 0 && c === 0) || (r === 0 && c === 4) || (r === 4 && c === 0) || (r === 4 && c === 4), active: false },
+            cross: { name: "Cruz (+)", desc: "Fila y columna central.", isCellInPattern: (r, c) => r === 2 || c === 2, active: false },
+            square: { name: "Cuadrado Perimetral", desc: "Contorno exterior.", isCellInPattern: (r, c) => r === 0 || r === 4 || c === 0 || c === 4, active: false },
+            blackout: { name: "Cartón Lleno", desc: "Las 25 casillas.", isCellInPattern: (r, c) => true, active: true }
+        };
+
+        let customDrawMatrix = Array(5).fill(0).map(() => Array(5).fill(false));
+
+        function getActiveThemeColor() {
+            let activeCards = selectedCardsIds.filter(id => cardStates[id] !== false);
+            if (activeCards.length === 0) return 'emerald';
+            let firstCard = allAvailableCards.find(c => c.id === activeCards[0]);
+            return firstCard ? firstCard.color : 'emerald';
+        }
+
+        function generateMiniDiagramHTML(patternCheckerOrMatrix, customClass = "w-6 h-6") {
+            let html = `<div class="grid grid-cols-5 gap-[1px] bg-slate-950 p-1 rounded border border-slate-700 ${customClass}">`;
+            for (let r = 0; r < 5; r++) {
+                for (let c = 0; c < 5; c++) {
+                    let active = false;
+                    if (typeof patternCheckerOrMatrix === 'function') active = patternCheckerOrMatrix(r, c);
+                    else if (Array.isArray(patternCheckerOrMatrix)) active = patternCheckerOrMatrix[r][c];
+                    html += `<div class="rounded-[1px] ${active ? 'bg-indigo-500' : 'bg-slate-800'}"></div>`;
+                }
+            }
+            html += `</div>`;
+            return html;
+        }
+
+        function initModalitiesList() {
+            const container = document.getElementById('modalities-checkbox-container');
+            container.innerHTML = '';
+            
+            const themeColor = getActiveThemeColor();
+            const badge = document.getElementById('mode-theme-badge');
+            if (themeColor === 'emerald') {
+                badge.className = "text-[10px] px-2 py-0.5 rounded font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+                badge.textContent = "Tema Verde";
+            } else {
+                badge.className = "text-[10px] px-2 py-0.5 rounded font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/30";
+                badge.textContent = "Tema Azul";
+            }
+
+            for (let key in gameModes) {
+                let mode = gameModes[key];
+                let label = document.createElement('label');
+                label.className = "flex items-center justify-between p-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 cursor-pointer text-xs transition select-none";
+                let diagramHTML = generateMiniDiagramHTML(mode.isCellInPattern, "w-5 h-5");
+
+                label.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" value="${key}" ${mode.active ? 'checked' : ''} onchange="toggleModalityActive('${key}', this.checked)" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 bg-slate-950 border-slate-700">
+                        ${diagramHTML}
+                        <div>
+                            <span class="font-bold text-slate-200 block text-[11px]">${mode.name}</span>
+                            <span class="text-[9px] text-slate-400 block">${mode.desc}</span>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(label);
+            }
+            renderActiveModalitiesPreviewBar();
+        }
+
+        function renderActiveModalitiesPreviewBar() {
+            const bar = document.getElementById('active-modalities-preview-bar');
+            bar.innerHTML = '';
+            let activeKeys = Object.keys(gameModes).filter(k => gameModes[k].active);
+
+            if (activeKeys.length === 0) {
+                bar.innerHTML = '<span class="text-[11px] text-slate-500 italic">Ninguna modalidad seleccionada...</span>';
+                return;
+            }
+
+            activeKeys.forEach(key => {
+                let mode = gameModes[key];
+                let diagramHTML = generateMiniDiagramHTML(mode.isCellInPattern, "w-5 h-5");
+                let pill = document.createElement('div');
+                pill.className = "flex items-center gap-1.5 bg-slate-800 border border-indigo-500/40 px-2 py-1 rounded-lg text-xs shadow-sm";
+                pill.innerHTML = `${diagramHTML}<span class="font-semibold text-white text-[10px]">${mode.name}</span>`;
+                bar.appendChild(pill);
+            });
+        }
+
+        function toggleModalityActive(key, status) {
+            if (gameModes[key]) gameModes[key].active = status;
+            renderActiveModalitiesPreviewBar();
+            selectedCardsIds.forEach(id => {
+                if (cardStates[id] !== false) checkCardWinState(id);
+            });
+            updateMasterBoardPendingHighlights();
+        }
+
+        function initCustomDrawGrid() {
+            const container = document.getElementById('custom-draw-grid');
+            container.innerHTML = '';
+            for (let r = 0; r < 5; r++) {
+                for (let c = 0; c < 5; c++) {
+                    let btn = document.createElement('button');
+                    btn.type = "button";
+                    let active = customDrawMatrix[r][c];
+                    btn.className = `w-8 h-8 rounded-lg transition-all border ${active ? 'bg-indigo-600 border-indigo-400 shadow-md shadow-indigo-600/40' : 'bg-slate-900 border-slate-700 hover:border-slate-500'}`;
+                    btn.onclick = () => {
+                        customDrawMatrix[r][c] = !customDrawMatrix[r][c];
+                        initCustomDrawGrid();
+                    };
+                    container.appendChild(btn);
+                }
+            }
+        }
+
+        function clearCustomDrawGrid() {
+            customDrawMatrix = Array(5).fill(0).map(() => Array(5).fill(false));
+            initCustomDrawGrid();
+        }
+
+        function openCustomPatternModal() {
+            document.getElementById('custom-pattern-name').value = '';
+            clearCustomDrawGrid();
+            document.getElementById('custom-pattern-modal').classList.remove('hidden');
+        }
+
+        function closeCustomPatternModal() {
+            document.getElementById('custom-pattern-modal').classList.add('hidden');
+        }
+
+        function saveCustomPattern() {
+            let nameInput = document.getElementById('custom-pattern-name').value.trim();
+            if (!nameInput) { alert("Ingresa un nombre para la modalidad."); return; }
+            let hasActive = customDrawMatrix.some(row => row.some(val => val));
+            if (!hasActive) { alert("Selecciona al menos una casilla."); return; }
+
+            let modeKey = 'custom_' + Date.now();
+            let matrixCopy = JSON.parse(JSON.stringify(customDrawMatrix));
+
+            gameModes[modeKey] = {
+                name: nameInput,
+                desc: `Patrón personalizado.`,
+                isCellInPattern: (r, c) => matrixCopy[r][c],
+                active: true
+            };
+
+            closeCustomPatternModal();
+            initModalitiesList();
+            selectedCardsIds.forEach(id => {
+                if (cardStates[id] !== false) checkCardWinState(id);
+            });
+            updateMasterBoardPendingHighlights();
+        }
+
+        function buildCardSelectorModalList(filterText = "") {
+            const container = document.getElementById('selector-cards-list');
+            container.innerHTML = '';
+
+            const groups = {};
+            
+            allAvailableCards.forEach(card => {
+                if (filterText && !card.title.toLowerCase().includes(filterText.toLowerCase()) && !card.batch.toLowerCase().includes(filterText.toLowerCase())) {
+                    return;
+                }
+
+                let groupKey = `${card.color}_${card.batch}`;
+                if (!groups[groupKey]) {
+                    groups[groupKey] = { color: card.color, batchName: card.batch, cards: [] };
+                }
+                groups[groupKey].cards.push(card);
+            });
+
+            for (let gKey in groups) {
+                let group = groups[gKey];
+                let isEmerald = group.color === 'emerald';
+                
+                let borderClass = isEmerald ? 'border-emerald-500/30 bg-emerald-950/20' : 'border-blue-500/30 bg-blue-950/20';
+                let textClass = isEmerald ? 'text-emerald-300' : 'text-blue-300';
+                let badgeClass = isEmerald ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-blue-500/20 text-blue-300 border-blue-500/30';
+                
+                let details = document.createElement('details');
+                details.className = `border rounded-2xl overflow-hidden ${borderClass} transition mb-3 shadow-md`;
+                details.open = filterText.length > 0;
+                
+                let summary = document.createElement('summary');
+                summary.className = `p-4 bg-slate-900/90 hover:bg-slate-900 cursor-pointer flex justify-between items-center transition select-none list-none font-bold text-xs ${textClass}`;
+                summary.innerHTML = `
+                    <div class="flex items-center gap-2.5">
+                        <i class="fa-solid fa-layer-group text-sm"></i>
+                        <span class="text-sm">${group.batchName}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[11px] px-3 py-1 rounded-full border font-semibold ${badgeClass}">${group.cards.length} cartones</span>
+                        <i class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform duration-200"></i>
+                    </div>
+                `;
+
+                let contentDiv = document.createElement('div');
+                contentDiv.className = "p-3.5 border-t border-slate-700/60 bg-slate-950/70 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2.5 max-h-60 overflow-y-auto";
+
+                group.cards.forEach(card => {
+                    let isChecked = selectedCardsIds.includes(card.id);
+                    
+                    let btnColorClass = isEmerald 
+                        ? (isChecked ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/40 ring-2 ring-emerald-400/50' : 'bg-emerald-950/40 text-emerald-200 border-emerald-500/30 hover:bg-emerald-900/60')
+                        : (isChecked ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-600/40 ring-2 ring-blue-400/50' : 'bg-blue-950/40 text-blue-200 border-blue-500/30 hover:bg-blue-900/60');
+
+                    let label = document.createElement('label');
+                    label.className = `flex flex-col items-center justify-center p-2.5 rounded-xl border cursor-pointer transition-all duration-200 select-none text-center ${btnColorClass}`;
+                    
+                    let numeroCorto = card.title.replace(/Cartón\s*(Azul|Verde)?\s*#?/gi, '').trim();
+                    if (!numeroCorto) numeroCorto = card.id;
+
+                    label.innerHTML = `
+                        <input type="checkbox" value="${card.id}" class="selector-checkbox sr-only" ${isChecked ? 'checked' : ''} onchange="actualizarEstiloBotonCarton(this)">
+                        <span class="text-[10px] opacity-75 font-semibold uppercase tracking-wider mb-0.5">Cartón</span>
+                        <span class="text-sm font-black tracking-tight">#${numeroCorto}</span>
+                    `;
+                    contentDiv.appendChild(label);
+                });
+
+                details.appendChild(summary);
+                details.appendChild(contentDiv);
+                container.appendChild(details);
+            }
+        }
+
+        function actualizarEstiloBotonCarton(checkbox) {
+            let label = checkbox.closest('label');
+            let isEmerald = label.className.includes('emerald') || label.className.includes('emerald-950');
+            
+            if (checkbox.checked) {
+                if (isEmerald) {
+                    label.className = "flex flex-col items-center justify-center p-2.5 rounded-xl border cursor-pointer transition-all duration-200 select-none text-center bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/40 ring-2 ring-emerald-400/50";
+                } else {
+                    label.className = "flex flex-col items-center justify-center p-2.5 rounded-xl border cursor-pointer transition-all duration-200 select-none text-center bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-600/40 ring-2 ring-blue-400/50";
+                }
+            } else {
+                if (isEmerald) {
+                    label.className = "flex flex-col items-center justify-center p-2.5 rounded-xl border cursor-pointer transition-all duration-200 select-none text-center bg-emerald-950/40 text-emerald-200 border-emerald-500/30 hover:bg-emerald-900/60";
+                } else {
+                    label.className = "flex flex-col items-center justify-center p-2.5 rounded-xl border cursor-pointer transition-all duration-200 select-none text-center bg-blue-950/40 text-blue-200 border-blue-500/30 hover:bg-blue-900/60";
+                }
+            }
+        }
+
+        function filterCardSelector() {
+            let query = document.getElementById('card-search-input').value;
+            buildCardSelectorModalList(query);
+        }
+
+        function openCardSelectorModal() {
+            document.getElementById('card-search-input').value = '';
+            buildCardSelectorModalList();
+            document.getElementById('card-selector-modal').classList.remove('hidden');
+        }
+
+        function closeCardSelectorModal() {
+            document.getElementById('card-selector-modal').classList.add('hidden');
+        }
+
+        function selectAllCards(select) {
+            document.querySelectorAll('.selector-checkbox').forEach(cb => cb.checked = select);
+        }
+
+        function applyCardSelection() {
+            const checkboxes = document.querySelectorAll('.selector-checkbox:checked');
+            let nuevosIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+
+            if (nuevosIds.length === 0) {
+                alert("Debes seleccionar al menos un cartón para jugar.");
+                return;
+            }
+
+            nuevosIds.forEach(id => {
+                if (cardStates[id] === undefined) {
+                    cardStates[id] = true; 
+                }
+            });
+            selectedCardsIds = nuevosIds;
+
+            closeCardSelectorModal();
+            initActiveCards();
+            initModalitiesList();
+            updateMasterBoardPendingHighlights();
+        }
+
+        function toggleCardActiveState(cardId) {
+            cardStates[cardId] = !cardStates[cardId];
+            initActiveCards();
+            initModalitiesList();
+            updateMasterBoardPendingHighlights();
+        }
+
+        function removeCardCompletely(cardId) {
+            selectedCardsIds = selectedCardsIds.filter(id => id !== cardId);
+            delete cardStates[cardId];
+            delete cardMarks[cardId];
+            initActiveCards();
+            initModalitiesList();
+            updateMasterBoardPendingHighlights();
+        }
+
+        function initActiveCards() {
+            const container = document.getElementById('active-cards-container');
+            container.innerHTML = '';
+            
+            let activeCount = selectedCardsIds.filter(id => cardStates[id] !== false).length;
+            document.getElementById('active-cards-subtitle').textContent = `${activeCount} cartones activos en mesa`;
+
+            selectedCardsIds.forEach(id => {
+                let card = allAvailableCards.find(c => c.id === id);
+                if (!card) return;
+
+                let isActive = cardStates[cardId = id] !== false;
+
+                if (!cardMarks[card.id]) cardMarks[card.id] = { "2-2": true };
+
+                const cardWrapper = document.createElement('div');
+                cardWrapper.className = `bg-slate-900 border ${card.color === 'emerald' ? 'border-emerald-500/30' : 'border-blue-500/30'} rounded-xl p-3 shadow-md flex flex-col transition-all ${!isActive ? 'opacity-50 grayscale-[30%]' : ''}`;
+                
+                let headerHTML = `
+                    <div class="flex justify-between items-center mb-2 pb-2 border-b ${card.color === 'emerald' ? 'border-emerald-500/20' : 'border-blue-500/20'}">
+                        <span class="font-bold text-xs ${card.color === 'emerald' ? 'text-emerald-400' : 'text-blue-400'} flex items-center gap-1.5">
+                            <i class="fa-solid fa-ticket"></i> ${card.title}
+                        </span>
+                        <div class="flex items-center gap-1.5">
+                            <button onclick="toggleCardActiveState(${card.id})" class="text-[10px] ${isActive ? 'bg-amber-500/20 text-amber-300 border-amber-500/30 hover:bg-amber-500/30' : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/30'} px-2 py-0.5 rounded transition border font-semibold flex items-center gap-1" title="${isActive ? 'Inactivar cartón' : 'Activar cartón'}">
+                                <i class="fa-solid ${isActive ? 'fa-eye-slash' : 'fa-eye'}"></i> ${isActive ? 'Inactivar' : 'Activar'}
+                            </button>
+                            <button onclick="removeCardCompletely(${card.id})" class="text-[10px] bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 px-2 py-0.5 rounded transition border border-rose-500/30 flex items-center gap-1" title="Eliminar de la mesa">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                let gridHTML = `<div class="grid grid-cols-5 gap-1 text-center font-black text-xs mb-1 ${card.color === 'emerald' ? 'text-emerald-500' : 'text-blue-500'}">
+                    <div>B</div><div>I</div><div>N</div><div>G</div><div>O</div>
+                </div>`;
+
+                gridHTML += `<div class="grid grid-cols-5 gap-1" id="card-grid-${card.id}">`;
+                for (let r = 0; r < 5; r++) {
+                    for (let col = 0; col < 5; col++) {
+                        let val = card.numbers[r][col];
+                        let isFree = val === "FREE";
+                        let cellKey = `${r}-${col}`;
+                        let marked = isFree ? true : (cardMarks[card.id] && cardMarks[card.id][cellKey]);
+                        
+                        gridHTML += `
+                            <button onclick="toggleCellMark(${card.id}, ${r}, ${col}, '${val}')" 
+                                id="cell-${card.id}-${r}-${col}"
+                                class="h-8 rounded-lg font-bold text-xs flex items-center justify-center transition-all duration-200 border ${
+                                    isFree ? 'bg-indigo-600 text-white border-indigo-500 text-[10px]' : 
+                                    marked ? 'bingo-cell-marked' : 'bg-slate-800 text-slate-200 border-slate-700 hover:border-slate-500'
+                                }">
+                                ${isFree ? 'FREE' : val}
+                            </button>
+                        `;
+                    }
+                }
+                gridHTML += `</div>`;
+
+                cardWrapper.innerHTML = headerHTML + gridHTML;
+                container.appendChild(cardWrapper);
+            });
+            renderPlayerCards();
+        }
+
+        function renderPlayerCards() {
+            selectedCardsIds.forEach(id => {
+                if (cardStates[id] === false) return; 
+                let card = allAvailableCards.find(c => c.id === id);
+                if (!card) return;
+                for (let r = 0; r < 5; r++) {
+                    for (let col = 0; col < 5; col++) {
+                        let val = card.numbers[r][col];
+                        if (val === "FREE") continue;
+                        let cellKey = `${r}-${col}`;
+                        let isMarked = cardMarks[card.id] && cardMarks[card.id][cellKey];
+                        let btn = document.getElementById(`cell-${card.id}-${r}-${col}`);
+                        if (btn) {
+                            if (isMarked) {
+                                btn.classList.add('bingo-cell-marked');
+                                btn.classList.remove('bg-slate-800', 'text-slate-200', 'border-slate-700');
+                            } else {
+                                btn.classList.remove('bingo-cell-marked');
+                                btn.classList.add('bg-slate-800', 'text-slate-200', 'border-slate-700');
+                            }
+                        }
+                    }
+                }
+                checkCardWinState(card.id);
+            });
+            updateMasterBoardPendingHighlights();
+        }
+
+        function initMasterBoardColumns() {
+            const container = document.getElementById('master-board-columns');
+            container.innerHTML = '';
+
+            const columnsData = [
+                { letter: 'B', min: 1, max: 15, color: 'text-indigo-400' },
+                { letter: 'I', min: 16, max: 30, color: 'text-violet-400' },
+                { letter: 'N', min: 31, max: 45, color: 'text-emerald-400' },
+                { letter: 'G', min: 46, max: 60, color: 'text-amber-400' },
+                { letter: 'O', min: 61, max: 75, color: 'text-rose-400' }
+            ];
+
+            columnsData.forEach(col => {
+                let colDiv = document.createElement('div');
+                colDiv.className = "flex flex-col gap-1 bg-slate-900 border border-slate-700/80 rounded-xl p-1";
+                
+                let header = document.createElement('div');
+                header.className = `text-center font-black text-xs pb-0.5 border-b border-slate-700/60 ${col.color}`;
+                header.textContent = col.letter;
+                colDiv.appendChild(header);
+
+                let numbersBox = document.createElement('div');
+                numbersBox.className = "flex flex-col gap-0.5";
+
+                for (let num = col.min; num <= col.max; num++) {
+                    let numBtn = document.createElement('button');
+                    numBtn.type = "button";
+                    numBtn.id = `master-num-${num}`;
+                    numBtn.className = "bg-slate-950 border border-slate-800 hover:border-slate-600 rounded py-[2px] text-[10px] font-bold text-slate-400 text-center transition-all duration-150";
+                    numBtn.textContent = num;
+                    numBtn.onclick = () => toggleMasterNumber(num);
+                    numbersBox.appendChild(numBtn);
+                }
+
+                colDiv.appendChild(numbersBox);
+                container.appendChild(colDiv);
+            });
+        }
+
+        function toggleMasterNumber(num) {
+            if (masterMarkedNumbers.has(num)) {
+                masterMarkedNumbers.delete(num);
+                if (document.getElementById('auto-mark-toggle').checked) autoUnmarkNumberOnCards(num);
+            } else {
+                masterMarkedNumbers.add(num);
+                if (document.getElementById('auto-mark-toggle').checked) autoMarkNumberOnCards(num);
+            }
+            updateMasterBoardDisplay();
+            updateDrawnCountBadge();
+            evaluateAllCardsForAutomaticWin();
+        }
+
+        function updateMasterBoardDisplay() {
+            for (let num = 1; num <= 75; num++) {
+                let btn = document.getElementById(`master-num-${num}`);
+                if (!btn) continue;
+                btn.classList.remove('master-cell-marked', 'master-cell-pending-emerald', 'master-cell-pending-blue', 'bg-slate-950', 'border-slate-800', 'text-slate-400');
+                if (masterMarkedNumbers.has(num)) btn.classList.add('master-cell-marked');
+                else btn.classList.add('bg-slate-950', 'border-slate-800', 'text-slate-400');
+            }
+            applyPendingHighlightsToMasterBoard();
+        }
+
+        function updateMasterBoardPendingHighlights() { updateMasterBoardDisplay(); }
+
+        function getMissingNumbersForCardAndMode(cardId, modeKey, modeData) {
+            let card = allAvailableCards.find(c => c.id === cardId);
+            if (!card) return [];
+            let unmarketCells = [];
+
+            if (modeKey === 'line') {
+                for (let r = 0; r < 5; r++) {
+                    let rowCells = [], rowCountUnmarked = 0;
+                    for (let c = 0; c < 5; c++) {
+                        let val = card.numbers[r][c];
+                        if (val !== "FREE" && !isCellMarked(cardId, r, c)) { rowCountUnmarked++; rowCells.push(val); }
+                    }
+                    if (rowCountUnmarked === 1) unmarketCells.push(rowCells[0]);
+                }
+                for (let c = 0; c < 5; c++) {
+                    let colCells = [], colCountUnmarked = 0;
+                    for (let r = 0; r < 5; r++) {
+                        let val = card.numbers[r][c];
+                        if (val !== "FREE" && !isCellMarked(cardId, r, c)) { colCountUnmarked++; colCells.push(val); }
+                    }
+                    if (colCountUnmarked === 1) unmarketCells.push(colCells[0]);
+                }
+                let diag1Cells = [], diag1Unmarked = 0;
+                for (let i = 0; i < 5; i++) {
+                    let val = card.numbers[i][i];
+                    if (val !== "FREE" && !isCellMarked(cardId, i, i)) { diag1Unmarked++; diag1Cells.push(val); }
+                }
+                if (diag1Unmarked === 1) unmarketCells.push(diag1Cells[0]);
+
+                let diag2Cells = [], diag2Unmarked = 0;
+                for (let i = 0; i < 5; i++) {
+                    let val = card.numbers[i][4 - i];
+                    if (val !== "FREE" && !isCellMarked(cardId, i, 4 - i)) { diag2Unmarked++; diag2Cells.push(val); }
+                }
+                if (diag2Unmarked === 1) unmarketCells.push(diag2Cells[0]);
+            } else {
+                let patternUnmarkedNumbers = [];
+                let unmarkedCount = 0;
+                for (let r = 0; r < 5; r++) {
+                    for (let c = 0; c < 5; c++) {
+                        if (modeData.isCellInPattern(r, c)) {
+                            let val = card.numbers[r][c];
+                            if (val !== "FREE" && !isCellMarked(cardId, r, c)) { unmarkedCount++; patternUnmarkedNumbers.push(val); }
+                        }
+                    }
+                }
+                if (unmarkedCount === 1) unmarketCells.push(patternUnmarkedNumbers[0]);
+            }
+            return unmarketCells;
+        }
+
+        function applyPendingHighlightsToMasterBoard() {
+            let themeColor = getActiveThemeColor();
+            let pendingClass = themeColor === 'emerald' ? 'master-cell-pending-emerald' : 'master-cell-pending-blue';
+            let numbersToHighlight = new Set();
+
+            selectedCardsIds.forEach(cardId => {
+                if (cardStates[cardId] === false) return; 
+                for (let modeKey in gameModes) {
+                    let mode = gameModes[modeKey];
+                    if (!mode.active) continue;
+                    let missingNums = getMissingNumbersForCardAndMode(cardId, modeKey, mode);
+                    missingNums.forEach(num => { if (!masterMarkedNumbers.has(num)) numbersToHighlight.add(num); });
+                }
+            });
+
+            numbersToHighlight.forEach(num => {
+                let btn = document.getElementById(`master-num-${num}`);
+                if (btn && !masterMarkedNumbers.has(num)) {
+                    btn.classList.remove('bg-slate-950', 'border-slate-800', 'text-slate-400');
+                    btn.classList.add(pendingClass);
+                }
+            });
+        }
+
+        function updateDrawnCountBadge() {
+            document.getElementById('drawn-count-badge').textContent = `${masterMarkedNumbers.size} cantados`;
+        }
+
+        function autoMarkNumberOnCards(num) {
+            selectedCardsIds.forEach(id => {
+                if (cardStates[id] === false) return;
+                let card = allAvailableCards.find(c => c.id === id);
+                if (!card) return;
+                for (let r = 0; r < 5; r++) {
+                    for (let col = 0; col < 5; col++) {
+                        if (card.numbers[r][col] === num) {
+                            if (!cardMarks[card.id]) cardMarks[card.id] = {};
+                            cardMarks[card.id][`${r}-${col}`] = true;
+                        }
+                    }
+                }
+            });
+            renderPlayerCards();
+        }
+
+        function autoUnmarkNumberOnCards(num) {
+            selectedCardsIds.forEach(id => {
+                if (cardStates[id] === false) return;
+                let card = allAvailableCards.find(c => c.id === id);
+                if (!card) return;
+                for (let r = 0; r < 5; r++) {
+                    for (let col = 0; col < 5; col++) {
+                        if (card.numbers[r][col] === num) {
+                            if (cardMarks[card.id]) cardMarks[card.id][`${r}-${col}`] = false;
+                        }
+                    }
+                }
+            });
+            renderPlayerCards();
+        }
+
+        function toggleCellMark(cardId, r, col, val) {
+            if (val === "FREE" || cardStates[cardId] === false) return;
+            if (!cardMarks[cardId]) cardMarks[cardId] = {};
+            cardMarks[cardId][`${r}-${col}`] = !cardMarks[cardId][`${r}-${col}`];
+            renderPlayerCards();
+            evaluateAllCardsForAutomaticWin();
+        }
+
+        function isCellMarked(cardId, r, col) {
+            let card = allAvailableCards.find(c => c.id === cardId);
+            if (card && card.numbers[r][col] === "FREE") return true;
+            return cardMarks[cardId] && cardMarks[cardId][`${r}-${col}`];
+        }
+
+        function checkSingleModeWin(cardId, modeKey, modeData) {
+            if (modeKey === 'line') {
+                for (let r = 0; r < 5; r++) {
+                    let rowWin = true;
+                    for (let c = 0; c < 5; c++) { if (!isCellMarked(cardId, r, c)) { rowWin = false; break; } }
+                    if (rowWin) return true;
+                }
+                for (let c = 0; c < 5; c++) {
+                    let colWin = true;
+                    for (let r = 0; r < 5; r++) { if (!isCellMarked(cardId, r, c)) { colWin = false; break; } }
+                    if (colWin) return true;
+                }
+                let diag1 = true, diag2 = true;
+                for (let i = 0; i < 5; i++) {
+                    if (!isCellMarked(cardId, i, i)) diag1 = false;
+                    if (!isCellMarked(cardId, i, 4 - i)) diag2 = false;
+                }
+                return diag1 || diag2;
+            }
+
+            for (let r = 0; r < 5; r++) {
+                for (let c = 0; c < 5; c++) {
+                    if (modeData.isCellInPattern(r, c) && !isCellMarked(cardId, r, c)) return false;
+                }
+            }
+            return true;
+        }
+
+        function getCompletedModalities(cardId) {
+            let matched = [];
+            for (let key in gameModes) {
+                let mode = gameModes[key];
+                if (mode.active && checkSingleModeWin(cardId, key, mode)) matched.push(mode.name);
+            }
+            return matched;
+        }
+
+        function checkCardWinState(cardId) {}
+
+        function evaluateAllCardsForAutomaticWin() {
+            let currentWinsThisTurn = new Set();
+            selectedCardsIds.forEach(cardId => {
+                if (cardStates[cardId] === false) return;
+                let card = allAvailableCards.find(c => c.id === cardId);
+                let matchedModes = getCompletedModalities(cardId);
+                matchedModes.forEach(modeName => {
+                    let winSignature = `${cardId}-${modeName}`;
+                    currentWinsThisTurn.add(winSignature);
+                    if (!alreadyDeclaredWins.has(winSignature)) {
+                        alreadyDeclaredWins.add(winSignature);
+                        showModal("¡BINGO CANTADO!", `El <strong>${card.title}</strong> ha completado la figura.`, `Cartón: ${card.title}<br>Modalidad: ${modeName}`);
+                    }
+                });
+            });
+            for (let winSig of alreadyDeclaredWins) {
+                if (!currentWinsThisTurn.has(winSig)) alreadyDeclaredWins.delete(winSig);
+            }
+        }
+
+        function showModal(title, description, details) {
+            document.getElementById('win-title').textContent = title;
+            document.getElementById('win-description').innerHTML = description;
+            document.getElementById('win-details').innerHTML = details;
+            document.getElementById('win-modal').classList.remove('hidden');
+        }
+
+        function closeWinModal() { document.getElementById('win-modal').classList.add('hidden'); }
+
+        function clearAllMarks() {
+            cardMarks = {};
+            alreadyDeclaredWins.clear();
+            selectedCardsIds.forEach(id => cardMarks[id] = { "2-2": true });
+            renderPlayerCards();
+        }
+
+        function resetGame() {
+            masterMarkedNumbers.clear();
+            cardMarks = {};
+            alreadyDeclaredWins.clear();
+            selectedCardsIds.forEach(id => cardMarks[id] = { "2-2": true });
+            initMasterBoardColumns();
+            renderPlayerCards();
+            updateDrawnCountBadge();
+        }
+
+        function downloadApp() {
+            const blob = new Blob([document.documentElement.outerHTML], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'nuevo_bingo_firebase.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>

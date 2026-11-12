@@ -1,0 +1,1632 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Control de Bingo - Tablero Vertical</title>
+  <style>
+    :root {
+      --primary: #d32f2f;
+      --primary-dark: #9a0007;
+      --bg: #f5f5f5;
+      --card-bg: #ffffff;
+      --marked: #2e7d32;
+      --accent: #0288d1;
+      --winner-gold: #f57f17;
+      --danger: #c62828;
+      --inactive: #9e9e9e;
+      --near-bingo: #ffeb3b; 
+      --pink-card: #e91e63;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg);
+      margin: 0;
+      padding: 15px;
+      color: #333;
+    }
+    h1 {
+      text-align: center;
+      color: var(--primary);
+      margin-bottom: 20px;
+    }
+
+    /* BARRA SUPERIOR DE MODOS (ADMIN / JUGADOR) */
+    .role-switcher-bar {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .role-switcher-bar button {
+      padding: 10px 20px;
+      font-size: 1rem;
+      border-radius: 20px;
+    }
+
+    .main-layout {
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 20px;
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+    @media (max-width: 1100px) {
+      .main-layout { grid-template-columns: 1fr; }
+    }
+    .left-column, .right-column {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .panel {
+      background: var(--card-bg);
+      padding: 15px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    details.panel { padding: 15px; }
+    details.panel > summary.panel-title {
+      cursor: pointer;
+      user-select: none;
+      list-style: none;
+      margin-bottom: 0;
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 5px;
+    }
+    details.panel > summary.panel-title::-webkit-details-marker { display: none; }
+    details.panel[open] > summary.panel-title { margin-bottom: 12px; }
+    .panel-toggle-icon::after {
+      content: '▼';
+      font-size: 0.8rem;
+      display: inline-block;
+      transition: transform 0.2s ease;
+    }
+    details[open] .panel-toggle-icon::after { transform: rotate(180deg); }
+    .panel-title {
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: var(--primary);
+      margin-bottom: 12px;
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .flex-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    input[type="number"], input[type="text"], select, textarea {
+      font-size: 0.95rem;
+      padding: 8px;
+      border: 2px solid #ccc;
+      border-radius: 8px;
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--primary); }
+    .num-input {
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 1.2rem !important;
+      text-align: center;
+    }
+    button {
+      padding: 8px 14px;
+      font-size: 0.9rem;
+      font-weight: bold;
+      color: white;
+      background-color: var(--primary);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background-color: var(--primary-dark); }
+    button.btn-blue { background-color: var(--accent); }
+    button.btn-blue:hover { background-color: #01579b; }
+    button.btn-gold { background-color: #f57c00; }
+    button.btn-gold:hover { background-color: #e65100; }
+    button.btn-reset { background-color: #666; }
+    button.btn-reset:hover { background-color: #333; }
+    button.btn-danger { background-color: var(--danger); }
+    button.btn-danger:hover { background-color: #8e0000; }
+    button.btn-pink { background-color: #e91e63; }
+    button.btn-pink:hover { background-color: #c2185b; }
+    button.btn-green { background-color: #2e7d32; }
+    button.btn-green:hover { background-color: #1b5e20; }
+    .counter-badge {
+      background: var(--accent);
+      color: white;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: bold;
+    }
+    @keyframes blink-marked {
+      0% { background-color: #a9dfbf; color: #111; transform: scale(1.05); }
+      20% { background-color: var(--marked); color: white; transform: scale(1); }
+      100% { background-color: var(--marked); color: white; transform: scale(1); }
+    }
+    @keyframes alerte-proximo {
+      0% { background-color: #ffe082; box-shadow: 0 0 4px #ffe082; }
+      50% { background-color: var(--near-bingo); box-shadow: 0 0 12px #fbc02d; }
+      100% { background-color: #ffe082; box-shadow: 0 0 4px #ffe082; }
+    }
+    .tablero-vertical-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+      margin-top: 15px;
+      background: #fafafa;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+    }
+    .tablero-columna {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .tablero-header-vertical {
+      font-weight: bold;
+      background: var(--primary);
+      color: white;
+      text-align: center;
+      padding: 6px 0;
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+    .tablero-cell-vertical {
+      background: #fff;
+      border: 1px solid #ccc;
+      text-align: center;
+      padding: 6px 0;
+      font-size: 0.85rem;
+      font-weight: bold;
+      border-radius: 4px;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s;
+    }
+    .tablero-cell-vertical:hover { border-color: var(--primary); }
+    .tablero-cell-vertical.called {
+      background: var(--marked);
+      color: white;
+      border-color: var(--marked);
+    }
+    .tablero-cell-vertical.near-miss-tablero {
+      animation: alerte-proximo 1.2s infinite ease-in-out;
+      border-color: #fbc02d;
+      color: #000;
+    }
+    .tablero-cell-vertical.just-called {
+      animation: blink-marked 1s ease-in-out;
+    }
+    .history-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 8px;
+    }
+    .chip-tag {
+      background: var(--accent);
+      color: white;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+    }
+    .chip-tag:hover { background: var(--danger); }
+    .shapes-selector-box {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 6px;
+      background: #f0f4f8;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #d0d7de;
+      margin-bottom: 10px;
+    }
+    .shape-checkbox-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      background: white;
+      padding: 5px 8px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+    .shape-checkbox-item label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      flex-grow: 1;
+    }
+    .btn-delete-shape {
+      background: none;
+      border: none;
+      color: var(--danger);
+      cursor: pointer;
+      font-weight: bold;
+      padding: 2px 4px;
+      font-size: 0.75rem;
+      border-radius: 4px;
+    }
+    .btn-delete-shape:hover { background-color: #ffebee; }
+    .carton-editor-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 42px);
+      gap: 4px;
+      margin: 10px 0;
+    }
+    .carton-cell-input {
+      width: 42px;
+      height: 38px;
+      text-align: center;
+      font-size: 1rem;
+      font-weight: bold;
+      border: 2px solid #0288d1;
+      border-radius: 6px;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    .carton-cell-input.free-cell {
+      background-color: #e8f5e9;
+      border-color: #2e7d32;
+      color: #2e7d32;
+      font-size: 0.7rem;
+    }
+    .carton-header-labels {
+      display: grid;
+      grid-template-columns: repeat(5, 42px);
+      gap: 4px;
+      margin-bottom: 4px;
+      text-align: center;
+      font-weight: bold;
+      color: var(--primary);
+      font-size: 0.9rem;
+    }
+    .import-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 5px;
+    }
+    .custom-shape-container {
+      margin-top: 10px;
+      padding: 10px;
+      background: #f0f4c3;
+      border-radius: 8px;
+    }
+    .custom-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 35px);
+      gap: 4px;
+      margin: 8px 0;
+    }
+    .custom-cell {
+      width: 35px;
+      height: 35px;
+      background-color: #fff;
+      border: 2px solid #9e9d24;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 0.8rem;
+    }
+    .custom-cell.selected {
+      background-color: #afb42b;
+      color: white;
+    }
+    .color-section-box {
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: #fafafa;
+      transition: all 0.3s ease;
+    }
+    .batch-actions-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #fff;
+      padding: 8px 12px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+    .cards-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 15px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 3px solid #e91e63;
+      border-radius: 10px;
+      padding: 10px;
+      position: relative;
+      transition: all 0.2s;
+    }
+    .card.to-delete {
+      border-color: var(--danger) !important;
+      background-color: #ffebee;
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .card-title-box {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .card-title {
+      font-weight: bold;
+      font-size: 1rem;
+      color: #e91e63;
+    }
+    .card-actions {
+      display: flex;
+      gap: 4px;
+    }
+    .bingo-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 4px;
+      text-align: center;
+    }
+    .header-cell {
+      font-weight: bold;
+      background-color: #e91e63;
+      color: white;
+      padding: 4px 0;
+      border-radius: 4px;
+      font-size: 0.85rem;
+    }
+    .cell {
+      background-color: #fff0f5;
+      border: 1px solid #f8bbd0;
+      padding: 8px 0;
+      font-weight: bold;
+      font-size: 0.95rem;
+      border-radius: 4px;
+      color: #333;
+      transition: background-color 0.2s;
+    }
+    .cell.marked {
+      background-color: var(--marked) !important;
+      color: white;
+    }
+    .cell.free {
+      font-size: 0.75rem;
+      background-color: #e8f5e9;
+      color: #2e7d32;
+    }
+    .winner-highlight {
+      border: 4px solid var(--winner-gold) !important;
+    }
+
+    /* ESTILOS ESPECÍFICOS PARA EL MODO JUGADOR MÓVIL */
+    #vistaJugador {
+      display: none;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    .player-setup-box {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      margin-bottom: 15px;
+      text-align: center;
+    }
+    .player-card-view {
+      background: white;
+      padding: 15px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    .player-card-view .bingo-grid {
+      gap: 6px;
+    }
+    .player-card-view .cell {
+      padding: 14px 0;
+      font-size: 1.2rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Control de Bingo - Tablero Vertical</h1>
+
+  <!-- BARRA PARA CAMBIAR ENTRE VISTA DE CANTADOR Y VISTA DE JUGADOR -->
+  <div class="role-switcher-bar">
+    <button class="btn-blue" onclick="cambiarVista('admin')">🖥️ Panel Cantador (Admin)</button>
+    <button class="btn-pink" onclick="cambiarVista('jugador')">📱 Modo Jugador (Móvil)</button>
+  </div>
+
+  <!-- VISTA PRINCIPAL: ADMIN / CANTADOR -->
+  <div class="main-layout" id="vistaAdmin">
+    
+    <div class="left-column">
+      
+      <!-- PANEL 1: TABLERO -->
+      <div class="panel">
+        <div class="panel-title">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span>TABLERO</span>
+            <span class="counter-badge" id="counterBadge">0 / 75</span>
+          </div>
+          <button class="btn-reset" style="font-size: 0.8rem; padding: 4px 10px;" onclick="reiniciarPartida()">Reiniciar</button>
+        </div>
+        <div class="flex-row">
+          <input type="number" id="numInput" class="num-input" min="1" max="75" placeholder="" autofocus>
+        </div>
+        <div style="margin-top: 10px;">
+          <small style="color: #666; font-size: 0.8rem;">Últimas 5 fichas marcadas:</small>
+          <div class="history-chips" id="listaNumeros"></div>
+        </div>
+        <div class="tablero-vertical-grid" id="tableroVisual"></div>
+      </div>
+
+      <!-- RESPALDOS -->
+      <details class="panel">
+        <summary class="panel-title">
+          <span>⚙️ Gestión de Respaldos</span>
+          <span class="panel-toggle-icon"></span>
+        </summary>
+        <p style="font-size: 0.8rem; margin: 0 0 10px 0; color: #666;">Exporta una copia de seguridad o importa un respaldo previo.</p>
+        <div class="flex-row">
+          <button class="btn-gold" style="flex: 1; font-size: 0.85rem;" onclick="exportarCopiaSeguridad()">💾 Respaldar Datos</button>
+          <button class="btn-blue" style="flex: 1; font-size: 0.85rem;" onclick="document.getElementById('fileInput').click()">📂 Cargar Backup</button>
+          <input type="file" id="fileInput" accept=".json" style="display: none;" onchange="importarCopiaSeguridad(event)">
+        </div>
+      </details>
+
+      <!-- PANEL 2: FORMAS ACTIVAS -->
+      <details class="panel" open>
+        <summary class="panel-title">
+          <span>2. Formas Activas</span>
+          <span class="panel-toggle-icon"></span>
+        </summary>
+        <div class="shapes-selector-box" id="shapesSelectorBox"></div>
+        <button class="btn-blue" style="font-size: 0.8rem; padding: 5px 10px;" onclick="toggleDiseñador()">➕ Nueva Forma Personalizada</button>
+        <div class="custom-shape-container" id="customShapeContainer" style="display: none;">
+          <input type="text" id="customShapeName" placeholder="Nombre de la forma..." style="width: 100%; margin-bottom:8px; box-sizing: border-box;"><br>
+          <div class="custom-grid" id="customGrid"></div>
+          <button class="btn-gold" style="font-size: 0.8rem;" onclick="guardarNuevaForma()">💾 Guardar Forma</button>
+        </div>
+      </details>
+
+      <!-- PANEL 3: REGISTRAR CARTÓN -->
+      <details class="panel">
+        <summary class="panel-title">
+          <span>3. Registrar Cartón</span>
+          <span class="panel-toggle-icon"></span>
+        </summary>
+        <div class="import-container">
+          <div>
+            <input type="text" id="newCartonName" placeholder="Nombre (Ej: Cartón 01)" style="width: 100%; margin-bottom: 6px; box-sizing: border-box;">
+            <div class="carton-header-labels">
+              <span>B</span><span>I</span><span>N</span><span>G</span><span>O</span>
+            </div>
+            <div class="carton-editor-grid" id="editorGrid"></div>
+            <button class="btn-blue" style="width: 100%; margin-bottom: 8px;" onclick="agregarNuevoCartonDesdeMatriz()">💾 Guardar Cartón</button>
+          </div>
+          <div style="border-top: 1px solid #eee; padding-top: 8px;">
+            <label style="font-size: 0.85rem;"><strong>O pegar texto copiado:</strong></label>
+            <textarea id="textoCopiadoInput" rows="3" style="width: 100%; box-sizing: border-box; resize: vertical; margin-top: 4px;" placeholder="Pega aquí los números..."></textarea>
+            <button class="btn-gold" style="width: 100%; margin-top: 6px; font-size: 0.85rem;" onclick="procesarTextoPegado()">⚡ Extraer Números</button>
+          </div>
+        </div>
+      </details>
+
+      <!-- PANEL 4: CARTONES POR COLOR -->
+      <details class="panel" open>
+        <summary class="panel-title">
+          <span>4. Cartones por Color</span>
+          <span class="panel-toggle-icon"></span>
+        </summary>
+        
+        <div class="color-section-box" id="colorSectionBox">
+          <label style="font-size: 0.85rem; font-weight: bold; display: block; margin-bottom: 6px;">Selecciona el Color del Lote:</label>
+          <select id="selectColorLote" style="width: 100%; margin-bottom: 10px;" onchange="alCambiarColorLote()">
+            <option value="" disabled selected>-- Selecciona un color --</option>
+            <option value="rosado">🌸 Rosado</option>
+            <option value="azul">💙 Azul (1 al 150)</option>
+            <option value="verde">💚 Verde (1 al 150)</option>
+            <option value="morado">💜 Morado</option>
+            <option value="rojo">❤️ Rojo</option>
+            <option value="amarillo">💛 Amarillo</option>
+          </select>
+
+          <div id="areaActivarLote" style="display: none;">
+            <label style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 4px;">Escribe número(s) o rango (ej: 1,5,10 o 1-50):</label>
+            <input type="text" id="inputNumerosLote" placeholder="Ej: 1, 2 o deja vacío para todos" style="width: 100%; margin-bottom: 8px; box-sizing: border-box;">
+            <button id="btnActivarLote" style="width: 100%; font-size: 0.85rem;" onclick="buscarYActivarLote()">🔍 Buscar y Activar</button>
+          </div>
+        </div>
+
+      </details>
+
+    </div>
+
+    <div class="right-column">
+      <div class="panel" style="flex-grow: 1;">
+        <div class="panel-title">
+          <span>5. Cartones en Juego (Activos)</span>
+        </div>
+        <div class="batch-actions-bar" style="margin-bottom: 12px;">
+          <div>
+            <input type="checkbox" id="selectAllCheckbox" onchange="toggleSeleccionarTodos(this.checked)">
+            <label for="selectAllCheckbox" style="font-weight: bold; cursor: pointer; font-size: 0.9rem; margin-left: 4px;">Seleccionar Todos</label>
+          </div>
+          <div class="flex-row">
+            <button class="btn-danger" id="btnDeleteSelected" style="font-size: 0.8rem; padding: 6px 10px;" onclick="eliminarCartonesSeleccionados()" disabled>🗑️ Eliminar de la BD (0)</button>
+            <button class="btn-reset" style="font-size: 0.8rem; padding: 6px 10px;" onclick="desactivarTodosLosCartones()">Ocultar Todos</button>
+          </div>
+        </div>
+        <div class="cards-container" id="contenedorCartones"></div>
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- VISTA SECUNDARIA: MODO JUGADOR (MÓVIL) -->
+  <div id="vistaJugador">
+    <div class="player-setup-box">
+      <h2 style="color: var(--primary); margin-top: 0;">¡Hola Jugador! 📱</h2>
+      <p style="font-size: 0.9rem; color: #666;">Selecciona tu color de lote y busca tu cartón para jugar:</p>
+      
+      <div style="display: flex; flex-direction: column; gap: 10px; text-align: left;">
+        <div>
+          <label style="font-size: 0.85rem; font-weight: bold;">Color de Lote:</label>
+          <select id="playerColorSelect" style="width: 100%; margin-top: 4px;" onchange="poblarSelectorCartonesJugador()">
+            <option value="" disabled selected>-- Elige tu color --</option>
+            <option value="rosado">🌸 Rosado</option>
+            <option value="azul">💙 Azul</option>
+            <option value="verde">💚 Verde</option>
+            <option value="morado">💜 Morado</option>
+            <option value="rojo">❤️ Rojo</option>
+            <option value="amarillo">💛 Amarillo</option>
+          </select>
+        </div>
+
+        <div>
+          <label style="font-size: 0.85rem; font-weight: bold;">Tu Cartón:</label>
+          <select id="playerCartonSelect" style="width: 100%; margin-top: 4px;">
+            <option value="" disabled selected>-- Primero elige un color --</option>
+          </select>
+        </div>
+
+        <button class="btn-pink" style="width: 100%; margin-top: 5px; padding: 12px; font-size: 1rem;" onclick="cargarCartonJugador()">🎯 Cargar Mi Cartón</button>
+      </div>
+    </div>
+
+    <!-- CONTENEDOR DONDE SE PINTA EL CARTÓN DEL JUGADOR -->
+    <div id="playerCardDisplayArea"></div>
+  </div>
+
+
+  <script>
+    const CONFIG_COLORES = {
+      rosado: { hex: "#e91e63", bg: "#fce4ec", btnClass: "btn-pink" },
+      morado: { hex: "#9c27b0", bg: "#f3e5f5", btnClass: "" },
+      azul:   { hex: "#0288d1", bg: "#e1f5fe", btnClass: "btn-blue" },
+      verde:  { hex: "#2e7d32", bg: "#e8f5e9", btnClass: "btn-green" },
+      rojo:   { hex: "#d32f2f", bg: "#ffebee", btnClass: "" },
+      amarillo:{ hex: "#f57f17", bg: "#fffde7", btnClass: "btn-gold" }
+    };
+
+    const CARTONES_ROSADOS_INICIALES = [];
+    const CARTONES_AZULES_INICIALES = [];
+    const CARTONES_VERDES_INICIALES = [];
+    let cartonesData = [];
+
+    function normalizarYOrdenarCarton(carton) {
+      if (!carton.matrix || !Array.isArray(carton.matrix)) return;
+
+      if (!carton.colorGroup && carton.id) {
+        let idLower = carton.id.toLowerCase();
+        if (idLower.includes("azul")) carton.colorGroup = "azul";
+        else if (idLower.includes("rosado") || idLower.includes("rosa")) carton.colorGroup = "rosado";
+        else if (idLower.includes("verde")) carton.colorGroup = "verde";
+        else if (idLower.includes("morado") || idLower.includes("violeta")) carton.colorGroup = "morado";
+        else if (idLower.includes("rojo")) carton.colorGroup = "rojo";
+        else if (idLower.includes("amarillo")) carton.colorGroup = "amarillo";
+      }
+
+      if (carton.colorGroup && CONFIG_COLORES[carton.colorGroup]) {
+        carton.borderColor = CONFIG_COLORES[carton.colorGroup].hex;
+      } else if (!carton.borderColor) {
+        carton.borderColor = "#e91e63";
+      }
+
+      let idLower = carton.id ? carton.id.toLowerCase() : "";
+      let numMatch = String(carton.id).match(/\d+/);
+      let numCarton = numMatch ? parseInt(numMatch[0]) : 0;
+
+      if (idLower.includes("azul") && numCarton >= 61 && numCarton <= 120 && carton.matrix.length === 5 && Array.isArray(carton.matrix[0])) {
+        let transpuesta = Array(5).fill(null).map(() => Array(5).fill(0));
+        for (let r = 0; r < 5; r++) {
+          for (let c = 0; c < 5; c++) {
+            transpuesta[r][c] = carton.matrix[c][r];
+          }
+        }
+        carton.matrix = transpuesta;
+      }
+
+      while (carton.matrix.length < 5) {
+        carton.matrix.push([0, 0, 0, 0, 0]);
+      }
+
+      for (let f = 0; f < 5; f++) {
+        if (!Array.isArray(carton.matrix[f])) {
+          carton.matrix[f] = [0, 0, 0, 0, 0];
+        }
+
+        for (let c = 0; c < 5; c++) {
+          let val = carton.matrix[f][c];
+          if (f === 2 && c === 2) {
+            carton.matrix[f][c] = ".es";
+          } else if (val === null || val === ".es" || val === "LIBRE" || val === "★" || val === 0) {
+            carton.matrix[f][c] = (f === 2 && c === 2) ? ".es" : 0;
+          } else {
+            let num = parseInt(val);
+            carton.matrix[f][c] = !isNaN(num) && num > 0 ? num : 0;
+          }
+        }
+      }
+    }
+
+    function repararYNormalizarTodos() {
+      cartonesData.forEach(carton => {
+        normalizarYOrdenarCarton(carton);
+      });
+    }
+
+    function cargarCartones() {
+      try {
+        const guardados = JSON.parse(localStorage.getItem("bingo_cartones"));
+        if (Array.isArray(guardados) && guardados.length > 0) {
+          cartonesData = guardados;
+        } else {
+          cartonesData = [...CARTONES_ROSADOS_INICIALES, ...CARTONES_AZULES_INICIALES, ...CARTONES_VERDES_INICIALES];
+        }
+      } catch(e) { 
+        cartonesData = [...CARTONES_ROSADOS_INICIALES, ...CARTONES_AZULES_INICIALES, ...CARTONES_VERDES_INICIALES]; 
+      }
+      
+      repararYNormalizarTodos();
+      cartonesData.forEach(c => c.active = c.active || false);
+    }
+    cargarCartones();
+
+    function alCambiarColorLote() {
+      const select = document.getElementById("selectColorLote");
+      const area = document.getElementById("areaActivarLote");
+      const containerBox = document.getElementById("colorSectionBox");
+      const btn = document.getElementById("btnActivarLote");
+      const colorKey = select.value;
+
+      if (!colorKey) {
+        area.style.display = "none";
+        return;
+      }
+
+      area.style.display = "block";
+      const config = CONFIG_COLORES[colorKey];
+
+      containerBox.style.backgroundColor = config.bg;
+      containerBox.style.borderColor = config.hex;
+      
+      btn.className = config.btnClass;
+      btn.style.backgroundColor = config.btnClass ? "" : config.hex;
+    }
+
+    function buscarYActivarLote() {
+      const selectColor = document.getElementById("selectColorLote");
+      const colorSeleccionado = selectColor ? selectColor.value : "";
+      const inputElem = document.getElementById("inputNumerosLote");
+      const entrada = inputElem ? inputElem.value.trim() : "";
+
+      if (!colorSeleccionado) {
+        alert("Por favor selecciona primero un color.");
+        return;
+      }
+
+      let conjuntoNumeros = new Set();
+
+      if (entrada !== "") {
+        const rangoMatch = entrada.match(/^(\d+)\s*-\s*(\d+)$/);
+        if (rangoMatch) {
+          const inicio = parseInt(rangoMatch[1]);
+          const fin = parseInt(rangoMatch[2]);
+          for (let i = Math.min(inicio, fin); i <= Math.max(inicio, fin); i++) {
+            conjuntoNumeros.add(i);
+          }
+        } else {
+          const numeros = entrada.match(/\d+/g);
+          if (numeros) {
+            numeros.forEach(n => conjuntoNumeros.add(parseInt(n)));
+          }
+        }
+      }
+
+      let encontrados = 0;
+
+      cartonesData.forEach(c => {
+        const coincideColor = c.colorGroup ? (c.colorGroup.toLowerCase() === colorSeleccionado.toLowerCase()) : false;
+
+        if (coincideColor) {
+          if (entrada === "") {
+            c.active = true;
+            encontrados++;
+          } else {
+            const numMatch = String(c.id).match(/\d+/);
+            const numCarton = numMatch ? parseInt(numMatch[0]) : -1;
+
+            if (conjuntoNumeros.has(numCarton)) {
+              c.active = true;
+              encontrados++;
+            }
+          }
+        }
+      });
+
+      if (encontrados === 0) {
+        alert(`No se encontraron cartones del color "${colorSeleccionado}" con los criterios ingresados.`);
+        return;
+      }
+
+      guardarEnStorage();
+      calcularNumerosFaltantes();
+      renderTableroVisual();
+      renderizarCartones();
+      actualizarInterfazSeleccion();
+      
+      if (inputElem) inputElem.value = "";
+      alert(`¡Se activaron ${encontrados} cartón(es) con éxito!`);
+    }
+
+    let numerosCantados = new Set();
+    try {
+      const guardados = JSON.parse(localStorage.getItem("bingo_cantados"));
+      if (Array.isArray(guardados)) numerosCantados = new Set(guardados);
+    } catch(e) { numerosCantados = new Set(); }
+
+    let numerosFaltantesParaBingo = new Set();
+    let ultimoNumeroCantado = null;
+    try {
+      ultimoNumeroCantado = JSON.parse(localStorage.getItem("bingo_ultimo_cantado")) || null;
+    } catch(e) { ultimoNumeroCantado = null; }
+
+    let matrizManualForma = Array(5).fill(null).map(() => Array(5).fill(false));
+
+    let diccionarioFormas = {
+      "Linea Horizontal": { tipo: "std" },
+      "Linea Vertical": { tipo: "std" },
+      "Diagonal": { tipo: "std" },
+      "Cuatro Esquinas": { tipo: "std" },
+      "Cartón Lleno": { tipo: "std" }
+    };
+    try {
+      const guardadas = JSON.parse(localStorage.getItem("bingo_diccionario_formas"));
+      if (guardadas && typeof guardadas === 'object') {
+        diccionarioFormas = { ...diccionarioFormas, ...guardadas };
+      }
+    } catch(e) {}
+
+    let formasActivas = new Set(["Linea Horizontal", "Cartón Lleno"]);
+    try {
+      const activasGuardadas = JSON.parse(localStorage.getItem("bingo_formas_activas"));
+      if (Array.isArray(activasGuardadas) && activasGuardadas.length > 0) {
+        formasActivas = new Set(activasGuardadas);
+      }
+    } catch(e) {}
+
+    window.onload = function() {
+      try { initEditorMatriz(); } catch(e) {}
+      try { initCustomGrid(); } catch(e) {}
+      try { renderSelectorFormas(); } catch(e) {}
+      try { actualizarHistorial(); } catch(e) {}
+      try { calcularNumerosFaltantes(); } catch(e) {}
+      try { renderTableroVisual(); } catch(e) {}
+      try { renderizarCartones(); } catch(e) {}
+      try { actualizarInterfazSeleccion(); } catch(e) {}
+
+      const numInput = document.getElementById("numInput");
+      if (numInput) {
+        numInput.addEventListener("keypress", function(event) {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            agregarNumero();
+          }
+        });
+      }
+    };
+
+    function guardarEnStorage() {
+      localStorage.setItem("bingo_cartones", JSON.stringify(cartonesData));
+      localStorage.setItem("bingo_cantados", JSON.stringify(Array.from(numerosCantados)));
+      localStorage.setItem("bingo_ultimo_cantado", JSON.stringify(ultimoNumeroCantado));
+      localStorage.setItem("bingo_diccionario_formas", JSON.stringify(diccionarioFormas));
+      localStorage.setItem("bingo_formas_activas", JSON.stringify(Array.from(formasActivas)));
+    }
+
+    function exportarCopiaSeguridad() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({
+        cartones: cartonesData,
+        cantados: Array.from(numerosCantados),
+        ultimo: ultimoNumeroCantado,
+        formas: diccionarioFormas,
+        activas: Array.from(formasActivas)
+      }));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `respaldo_bingo_${new Date().toISOString().slice(0,10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    function importarCopiaSeguridad(event) {
+      const file = event.target.files[0];
+      if (!file) {
+        alert("No se seleccionó ningún archivo.");
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const contenido = JSON.parse(e.target.result);
+          let nuevosCartones = [];
+
+          if (Array.isArray(contenido)) {
+            nuevosCartones = contenido;
+          } else if (contenido.cartones && Array.isArray(contenido.cartones)) {
+            nuevosCartones = contenido.cartones;
+            if (Array.isArray(contenido.cantados)) {
+              numerosCantados = new Set(contenido.cantados);
+            }
+            if (contenido.ultimo !== undefined) {
+              ultimoNumeroCantado = contenido.ultimo;
+            }
+          } else {
+            let posiblesArreglos = Object.values(contenido).filter(val => Array.isArray(val));
+            if (posiblesArreglos.length > 0) {
+              posiblesArreglos.sort((a, b) => b.length - a.length);
+              nuevosCartones = posiblesArreglos[0];
+            } else {
+              throw new Error("El JSON no contiene ninguna lista de cartones compatible.");
+            }
+          }
+
+          nuevosCartones.forEach(c => {
+            c.active = false;
+            c.selected = false;
+          });
+
+          cartonesData = nuevosCartones;
+          repararYNormalizarTodos();
+
+          guardarEnStorage();
+          calcularNumerosFaltantes();
+          renderSelectorFormas();
+          actualizarHistorial();
+          renderTableroVisual();
+          renderizarCartones();
+          actualizarInterfazSeleccion();
+          
+          event.target.value = "";
+          alert(`¡Se cargó el respaldo con éxito! Total de cartones: ${nuevosCartones.length}`);
+
+        } catch (error) {
+          alert("Error al procesar el JSON: " + error.message);
+        }
+      };
+
+      reader.readAsText(file);
+    }
+
+    function verificarNuevosGanadores() {
+      cartonesData.forEach(carton => {
+        if (!carton.active) return;
+        const status = comprobarSiGanoCarton(carton);
+        if (status.gano && ultimoNumeroCantado !== null) {
+          let contieneUltimo = carton.matrix.some(row => row.includes(ultimoNumeroCantado));
+          if (contieneUltimo) {
+            setTimeout(() => {
+              alert(`¡BINGO EN EL ${carton.id}!\nForma: ${status.detalles}`);
+            }, 100);
+          }
+        }
+      });
+    }
+
+    function agregarNumero() {
+      const input = document.getElementById("numInput");
+      if (!input) return;
+      const num = parseInt(input.value);
+      if (isNaN(num) || num < 1 || num > 75) return;
+      if (!numerosCantados.has(num)) {
+        numerosCantados.add(num);
+        ultimoNumeroCantado = num;
+        guardarEnStorage();
+        actualizarHistorial();
+        calcularNumerosFaltantes();
+        renderTableroVisual();
+        renderizarCartones();
+        if (document.getElementById('playerCardDisplayArea').innerHTML !== "") {
+          renderizarCartonJugadorActual(); // Refresca si el jugador está abierto en el mismo navegador
+        }
+        verificarNuevosGanadores();
+      }
+      input.value = "";
+      input.focus();
+    }
+
+    function agregarNumeroDirecto(num) {
+      if (!numerosCantados.has(num)) {
+        numerosCantados.add(num);
+        ultimoNumeroCantado = num;
+        guardarEnStorage();
+        actualizarHistorial();
+        calcularNumerosFaltantes();
+        renderTableroVisual();
+        renderizarCartones();
+        if (document.getElementById('playerCardDisplayArea').innerHTML !== "") {
+          renderizarCartonJugadorActual();
+        }
+        verificarNuevosGanadores();
+      }
+    }
+
+    function eliminarNumero(num) {
+      if (numerosCantados.has(num)) {
+        numerosCantados.delete(num);
+        if (ultimoNumeroCantado === num) {
+          const arr = Array.from(numerosCantados);
+          ultimoNumeroCantado = arr.length > 0 ? arr[arr.length - 1] : null;
+        }
+        guardarEnStorage();
+        actualizarHistorial();
+        calcularNumerosFaltantes();
+        renderTableroVisual();
+        renderizarCartones();
+        if (document.getElementById('playerCardDisplayArea').innerHTML !== "") {
+          renderizarCartonJugadorActual();
+        }
+      }
+    }
+
+    function actualizarHistorial() {
+      const lista = document.getElementById("listaNumeros");
+      if(!lista) return;
+      lista.innerHTML = "";
+      const ultimos5 = Array.from(numerosCantados).slice(-5);
+      ultimos5.forEach(num => {
+        const chip = document.createElement("div");
+        chip.className = "chip-tag";
+        chip.innerHTML = `${num} <span>✖</span>`;
+        chip.onclick = () => eliminarNumero(num);
+        lista.appendChild(chip);
+      });
+      document.getElementById("counterBadge").innerText = `${numerosCantados.size} / 75`;
+    }
+
+    function reiniciarPartida() {
+      if (confirm("¿Reiniciar la partida actual? Se limpiarán las bolas cantadas.")) {
+        numerosCantados.clear();
+        ultimoNumeroCantado = null;
+        guardarEnStorage();
+        actualizarHistorial();
+        calcularNumerosFaltantes();
+        renderTableroVisual();
+        renderizarCartones();
+      }
+    }
+
+    function eliminarCartonesSeleccionados() {
+      const seleccionados = cartonesData.filter(c => c.selected).length;
+      if (seleccionados === 0) return;
+      if (confirm(`¿Eliminar los ${seleccionados} cartones seleccionados permanentemente?`)) {
+        cartonesData = cartonesData.filter(c => !c.selected);
+        guardarEnStorage();
+        document.getElementById("selectAllCheckbox").checked = false;
+        calcularNumerosFaltantes();
+        renderTableroVisual();
+        renderizarCartones();
+        actualizarInterfazSeleccion();
+      }
+    }
+
+    function ocultarCartonUnico(index) {
+      cartonesData[index].active = false;
+      cartonesData[index].selected = false;
+      guardarEnStorage();
+      calcularNumerosFaltantes();
+      renderTableroVisual();
+      renderizarCartones();
+      actualizarInterfazSeleccion();
+    }
+
+    function desactivarTodosLosCartones() {
+      cartonesData.forEach(c => c.active = false);
+      guardarEnStorage();
+      calcularNumerosFaltantes();
+      renderTableroVisual();
+      renderizarCartones();
+      actualizarInterfazSeleccion();
+    }
+
+    function renderTableroVisual() {
+      const grid = document.getElementById("tableroVisual");
+      if(!grid) return;
+      grid.innerHTML = "";
+      const letras = ["B", "I", "N", "G", "O"];
+      const rangos = [[1, 15], [16, 30], [31, 45], [46, 60], [61, 75]];
+      
+      for (let c = 0; c < 5; c++) {
+        const colDiv = document.createElement("div");
+        colDiv.className = "tablero-columna";
+        
+        const header = document.createElement("div");
+        header.className = "tablero-header-vertical";
+        header.innerText = letras[c];
+        colDiv.appendChild(header);
+        
+        for (let num = rangos[c][0]; num <= rangos[c][1]; num++) {
+          const cell = document.createElement("div");
+          const isCalled = numerosCantados.has(num);
+          const isNearMiss = numerosFaltantesParaBingo.has(num);
+          cell.className = "tablero-cell-vertical";
+          if (isCalled) {
+            cell.classList.add("called");
+            if (num === ultimoNumeroCantado) cell.classList.add("just-called");
+          } else if (isNearMiss) {
+            cell.classList.add("near-miss-tablero");
+          }
+          cell.innerText = num;
+          cell.onclick = () => isCalled ? eliminarNumero(num) : agregarNumeroDirecto(num);
+          colDiv.appendChild(cell);
+        }
+        grid.appendChild(colDiv);
+      }
+    }
+
+    function initEditorMatriz() {
+      const grid = document.getElementById("editorGrid");
+      if (!grid) return;
+      grid.innerHTML = "";
+      for (let f = 0; f < 5; f++) {
+        for (let c = 0; c < 5; c++) {
+          const input = document.createElement("input");
+          input.type = "text";
+          input.className = "carton-cell-input";
+          input.id = `input-${f}-${c}`;
+          if (f === 2 && c === 2) {
+            input.value = "LIBRE";
+            input.classList.add("free-cell");
+          }
+          grid.appendChild(input);
+        }
+      }
+    }
+
+    function limpiarEditorMatriz() {
+      for (let f = 0; f < 5; f++) {
+        for (let c = 0; c < 5; c++) {
+          const input = document.getElementById(`input-${f}-${c}`);
+          if (input) {
+            if (f === 2 && c === 2) input.value = "LIBRE";
+            else input.value = "";
+          }
+        }
+      }
+    }
+
+    function procesarTextoPegado() {
+      const rawText = document.getElementById("textoCopiadoInput").value;
+      if (!rawText.trim()) return;
+      const numerosEncontrados = rawText.match(/\d+/g);
+      if (!numerosEncontrados) return;
+      const numeros = numerosEncontrados.map(n => parseInt(n)).filter(n => n >= 1 && n <= 75);
+      
+      limpiarEditorMatriz();
+      let index = 0;
+      for (let f = 0; f < 5; f++) {
+        for (let c = 0; c < 5; c++) {
+          if (f === 2 && c === 2) continue;
+          if (index < numeros.length) {
+            const el = document.getElementById(`input-${f}-${c}`);
+            if (el) {
+              el.value = numeros[index];
+              index++;
+            }
+          }
+        }
+      }
+    }
+
+    function agregarNuevoCartonDesdeMatriz() {
+      const nameInput = document.getElementById("newCartonName");
+      const nombre = nameInput.value.trim() || `Cartón ${cartonesData.length + 1}`;
+      
+      const colorSeleccionado = document.getElementById("selectColorLote").value || "rosado";
+      const hexColor = CONFIG_COLORES[colorSeleccionado] ? CONFIG_COLORES[colorSeleccionado].hex : "#e91e63";
+
+      let matrixData = Array(5).fill(null).map(() => Array(5).fill(0));
+      
+      for (let f = 0; f < 5; f++) {
+        for (let c = 0; c < 5; c++) {
+          if (f === 2 && c === 2) {
+            matrixData[f][c] = ".es";
+          } else {
+            const el = document.getElementById(`input-${f}-${c}`);
+            if (el) {
+              let val = el.value.trim().toUpperCase();
+              if (val === "" || val === "LIBRE" || val === "★") {
+                matrixData[f][c] = 0;
+              } else {
+                let num = parseInt(val);
+                matrixData[f][c] = isNaN(num) ? 0 : num;
+              }
+            }
+          }
+        }
+      }
+
+      cartonesData.push({ 
+        id: nombre, active: false, selected: false, borderColor: hexColor, colorGroup: colorSeleccionado, matrix: matrixData 
+      });
+      
+      guardarEnStorage();
+      calcularNumerosFaltantes();
+      renderTableroVisual();
+      renderizarCartones();
+      
+      if(nameInput) nameInput.value = "";
+      limpiarEditorMatriz();
+      alert(`"${nombre}" guardado correctamente.`);
+    }
+
+    function renderSelectorFormas() {
+      const box = document.getElementById("shapesSelectorBox");
+      if (!box) return;
+      box.innerHTML = "";
+      Object.keys(diccionarioFormas).forEach(nombreForma => {
+        const isChecked = formasActivas.has(nombreForma);
+        const item = document.createElement("div");
+        item.className = "shape-checkbox-item";
+        const esCargada = diccionarioFormas[nombreForma].tipo === "custom" || 
+                          ["Linea Horizontal", "Linea Vertical", "Diagonal", "Cuatro Esquinas", "Cartón Lleno"].indexOf(nombreForma) === -1;
+        item.innerHTML = `
+          <label>
+            <input type="checkbox" value="${nombreForma}" ${isChecked ? 'checked' : ''} onchange="toggleFormaActiva('${nombreForma}', this.checked)">
+            <span>${nombreForma}</span>
+          </label>
+          ${esCargada ? `<button class="btn-delete-shape" onclick="eliminarFormaPersonalizada('${nombreForma}')">✖</button>` : ''}
+        `;
+        box.appendChild(item);
+      });
+    }
+
+    function toggleFormaActiva(nombre, estado) {
+      if (estado) formasActivas.add(nombre);
+      else formasActivas.delete(nombre);
+      guardarEnStorage();
+      calcularNumerosFaltantes();
+      renderTableroVisual();
+      renderizarCartones();
+    }
+
+    function eliminarFormaPersonalizada(nombre) {
+      if (confirm(`¿Eliminar la forma "${nombre}"?`)) {
+        formasActivas.delete(nombre);
+        delete diccionarioFormas[nombre];
+        guardarEnStorage();
+        renderSelectorFormas();
+        calcularNumerosFaltantes();
+        renderTableroVisual();
+        renderizarCartones();
+      }
+    }
+
+    function toggleDiseñador() {
+      const p = document.getElementById("customShapeContainer");
+      if (p) p.style.display = p.style.display === "none" ? "block" : "none";
+    }
+
+    function initCustomGrid() {
+      const grid = document.getElementById("customGrid");
+      if (!grid) return;
+      grid.innerHTML = "";
+      for (let f = 0; f < 5; f++) {
+        for (let c = 0; c < 5; c++) {
+          const cell = document.createElement("div");
+          cell.className = "custom-cell";
+          cell.innerText = (f === 2 && c === 2) ? "★" : "";
+          cell.onclick = function() {
+            matrizManualForma[f][c] = !matrizManualForma[f][c];
+            this.classList.toggle("selected", matrizManualForma[f][c]);
+          };
+          grid.appendChild(cell);
+        }
+      }
+    }
+
+    function guardarNuevaForma() {
+      const nameInput = document.getElementById("customShapeName");
+      if (!nameInput) return;
+      const nombre = nameInput.value.trim();
+      
+      if (!nombre) {
+        alert("Por favor ingresa un nombre para la forma.");
+        return;
+      }
+      
+      if (diccionarioFormas[nombre]) {
+        alert("Ya existe una forma con ese nombre. Elige otro.");
+        return;
+      }
+      
+      diccionarioFormas[nombre] = { 
+        tipo: "custom", 
+        matrix: JSON.parse(JSON.stringify(matrizManualForma)) 
+      };
+      
+      if (!formasActivas) formasActivas = new Set();
+      formasActivas.add(nombre);
+      
+      guardarEnStorage();
+      renderSelectorFormas();
+      document.getElementById("customShapeContainer").style.display = "none";
+      nameInput.value = "";
+      matrizManualForma = Array(5).fill(null).map(() => Array(5).fill(false));
+      initCustomGrid();
+
+      calcularNumerosFaltantes();
+      renderTableroVisual();
+      renderizarCartones();
+      
+      alert(`¡Forma "${nombre}" creada y activada con éxito!`);
+    }
+
+    function toggleSeleccionCarton(index, checked) {
+      cartonesData[index].selected = checked;
+      guardarEnStorage();
+      actualizarInterfazSeleccion();
+    }
+
+    function toggleSeleccionarTodos(checked) {
+      cartonesData.forEach(c => {
+        if(c.active) c.selected = checked;
+      });
+      guardarEnStorage();
+      renderizarCartones();
+      actualizarInterfazSeleccion();
+    }
+
+    function actualizarInterfazSeleccion() {
+      const seleccionados = cartonesData.filter(c => c.selected).length;
+      const btn = document.getElementById("btnDeleteSelected");
+      if(btn) {
+        btn.innerText = `🗑️ Eliminar de la BD (${seleccionados})`;
+        btn.disabled = seleccionados === 0;
+      }
+    }
+
+    function comprobarSiGanoCarton(carton) {
+      const m = carton.matrix; 
+      const checkMarcado = (f, c) => m && m[c] && (m[c][f] === ".es" || m[c][f] === 0 || m[c][f] === "LIBRE" || m[c][f] === "★" || numerosCantados.has(m[c][f]));
+      let gano = false;
+      let detalles = "";
+      
+      for (let f = 0; f < 5; f++) {
+        if (formasActivas.has("Linea Horizontal")) {
+          let filaCompleta = true;
+          for (let c = 0; c < 5; c++) {
+            if (!checkMarcado(f, c)) { filaCompleta = false; break; }
+          }
+          if (filaCompleta) { gano = true; detalles = `Línea Horizontal Fila ${f+1}`; }
+        }
+      }
+      for (let c = 0; c < 5; c++) {
+        if (formasActivas.has("Linea Vertical")) {
+          let colCompleta = true;
+          for (let f = 0; f < 5; f++) {
+            if (!checkMarcado(f, c)) { colCompleta = false; break; }
+          }
+          if (colCompleta) { gano = true; detalles = `Línea Vertical Columna ${c+1}`; }
+        }
+      }
+      if (formasActivas.has("Diagonal")) {
+        let d1 = true, d2 = true;
+        for (let i = 0; i < 5; i++) {
+          if (!checkMarcado(i, i)) d1 = false;
+          if (!checkMarcado(i, 4 - i)) d2 = false;
+        }
+        if (d1) { gano = true; detalles = "Diagonal Principal"; }
+        if (d2) { gano = true; detalles = "Diagonal Inversa"; }
+      }
+      if (formasActivas.has("Cuatro Esquinas")) {
+        if (checkMarcado(0,0) && checkMarcado(0,4) && checkMarcado(4,0) && checkMarcado(4,4)) {
+          gano = true; detalles = "Cuatro Esquinas";
+        }
+      }
+      if (formasActivas.has("Cartón Lleno")) {
+        let lleno = true;
+        for (let f = 0; f < 5; f++) {
+          for (let c = 0; c < 5; c++) {
+            if (!checkMarcado(f, c)) { lleno = false; break; }
+          }
+        }
+        if (lleno) { gano = true; detalles = "Cartón Lleno"; }
+      }
+      Object.keys(diccionarioFormas).forEach(nombre => {
+        if (formasActivas.has(nombre) && diccionarioFormas[nombre].tipo === "custom") {
+          let cumplido = true;
+          const fm = diccionarioFormas[nombre].matrix;
+          for (let f = 0; f < 5; f++) {
+            for (let c = 0; c < 5; c++) {
+              if (fm[f][c] && !checkMarcado(f, c)) { cumplido = false; break; }
+            }
+          }
+          if (cumplido) { gano = true; detalles = nombre; }
+        }
+      });
+      return { gano, detalles };
+    }
+
+    function calcularNumerosFaltantes() {
+      numerosFaltantesParaBingo.clear();
+      cartonesData.forEach(carton => {
+        if (!carton.active) return;
+        const m = carton.matrix;
+        const checkMarcado = (f, c) => m && m[c] && (m[c][f] === ".es" || m[c][f] === 0 || m[c][f] === "LIBRE" || m[c][f] === "★" || numerosCantados.has(m[c][f]));
+        const comprobarFormaCasiCompleta = (celdasForma) => {
+          let faltantes = [];
+          celdasForma.forEach(pos => {
+            if (!checkMarcado(pos.f, pos.c)) {
+              if (m && m[pos.c] && m[pos.c][pos.f] !== undefined) {
+                faltantes.push(m[pos.c][pos.f]);
+              }
+            }
+          });
+          if (faltantes.length === 1 && typeof faltantes[0] === 'number') {
+            numerosFaltantesParaBingo.add(faltantes[0]);
+          }
+        };
+
+        if (formasActivas.has("Linea Horizontal")) {
+          for (let f = 0; f < 5; f++) {
+            let celdas = [];
+            for (let c = 0; c < 5; c++) celdas.push({f, c});
+            comprobarFormaCasiCompleta(celdas);
+          }
+        }
+        if (formasActivas.has("Linea Vertical")) {
+          for (let c = 0; c < 5; c++) {
+            let celdas = [];
+            for (let f = 0; f < 5; f++) celdas.push({f, c});
+            comprobarFormaCasiCompleta(celdas);
+          }
+        }
+        if (formasActivas.has("Diagonal")) {
+          let diag1 = [], diag2 = [];
+          for (let i = 0; i < 5; i++) {
+            diag1.push({f: i, c: i});
+            diag2.push({f: i, c: 4 - i});
+          }
+          comprobarFormaCasiCompleta(diag1);
+          comprobarFormaCasiCompleta(diag2);
+        }
+        if (formasActivas.has("Cuatro Esquinas")) {
+          comprobarFormaCasiCompleta([{f:0,c:0},{f:0,c:4},{f:4,c:0},{f:4,c:4}]);
+        }
+        if (formasActivas.has("Cartón Lleno")) {
+          let lleno = [];
+          for (let f = 0; f < 5; f++) {
+            for (let c = 0; c < 5; c++) lleno.push({f, c});
+          }
+          comprobarFormaCasiCompleta(lleno);
+        }
+
+        formasActivas.forEach(nombreForma => {
+          const formaObj = diccionarioFormas[nombreForma];
+          if (formaObj && formaObj.tipo === "custom" && formaObj.matrix) {
+            let celdasCustom = [];
+            for (let f = 0; f < 5; f++) {
+              for (let c = 0; c < 5; c++) {
+                if (formaObj.matrix[f][c] === true) {
+                  celdasCustom.push({f, c});
+                }
+              }
+            }
+            if (celdasCustom.length > 0) {
+              comprobarFormaCasiCompleta(celdasCustom);
+            }
+          }
+        });
+      });
+    }
+
+    function renderizarCartones() {
+      const container = document.getElementById("contenedorCartones");
+      if (!container) return;
+      container.innerHTML = "";
+      
+      let hayCartonesActivos = false;
+      cartonesData.forEach((carton, idx) => {
+        if (!carton.active) return;
+        hayCartonesActivos = true;
+        
+        const status = comprobarSiGanoCarton(carton);
+        const cardDiv = document.createElement("div");
+        const colorTema = carton.borderColor || "#e91e63";
+        
+        cardDiv.className = `card ${status.gano ? 'winner-highlight' : ''} ${carton.selected ? 'to-delete' : ''}`;
+        cardDiv.style.borderColor = status.gano ? 'var(--winner-gold)' : colorTema;
+        
+        let gridHtml = `<div class="bingo-grid">`;
+        const letras = ["B", "I", "N", "G", "O"];
+        letras.forEach(l => {
+          gridHtml += `<div class="header-cell" style="background-color: ${status.gano ? 'var(--winner-gold)' : colorTema}">${l}</div>`;
+        });
+        
+        for (let r = 0; r < 5; r++) {
+          for (let col = 0; col < 5; col++) {
+            const val = (carton.matrix && carton.matrix[col] && carton.matrix[col][r] !== undefined) ? carton.matrix[col][r] : 0;
+            
+            if (r === 2 && col === 2) {
+              gridHtml += `<div class="cell free">★</div>`;
+            } else if (val === null || val === 0 || val === ".es" || val === "LIBRE") {
+              gridHtml += `<div class="cell free">★</div>`;
+            } else {
+              const numVal = parseInt(val);
+              const isMarked = numerosCantados.has(numVal);
+              const isJustCalled = numVal === ultimoNumeroCantado;
+              gridHtml += `<div class="cell ${isMarked ? 'marked' : ''} ${isJustCalled ? 'just-called' : ''}" style="${isMarked && !status.gano ? 'background-color: var(--marked)' : (isMarked && status.gano ? 'background-color: var(--winner-gold)' : '')}">${numVal}</div>`;
+            }
+          }
+        }
+        gridHtml += `</div>`;
+        
+        cardDiv.innerHTML = `
+          <div class="card-header">
+            <div class="card-title-box">
+              <input type="checkbox" ${carton.selected ? 'checked' : ''} onchange="toggleSeleccionCarton(${idx}, this.checked)">
+              <span class="card-title" style="color: ${status.gano ? 'var(--winner-gold)' : colorTema}">${carton.id}</span>
+            </div>
+            <div class="card-actions">
+              <button class="btn-reset" style="padding: 3px 6px; font-size: 0.75rem;" onclick="ocultarCartonUnico(${idx})">Ocultar ✖</button>
+            </div>
+          </div>
+          ${gridHtml}
+        `;
+        container.appendChild(cardDiv);
+      });
+
+      if (!hayCartonesActivos) {
+        container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: #64748b; padding: 40px; background: white; border-radius: 12px; border: 2px dashed #cbd5e1;">
+          <h3>No hay cartones activos en pantalla</h3>
+          <p>Usa la sección <strong>4. Cartones por Color</strong> para seleccionar y activar el color deseado.</p>
+        </div>`;
+      }
+    }
+
+
+    /* FUNCIONES PARA EL MODO JUGADOR MÓVIL */
+    function cambiarVista(vista) {
+      const adminDiv = document.getElementById("vistaAdmin");
+      const jugadorDiv = document.getElementById("vistaJugador");
+      if (vista === 'admin') {
+        adminDiv.style.display = "grid";
+        jugadorDiv.style.display = "none";
+      } else {
+        adminDiv.style.display = "none";
+        jugadorDiv.style.display = "block";
+      }
+    }
+
+    function poblarSelectorCartonesJugador() {
+      const colorSeleccionado = document.getElementById("playerColorSelect").value;
+      const cartonSelect = document.getElementById("playerCartonSelect");
+      cartonSelect.innerHTML = '<option value="" disabled selected>-- Elige tu cartón --</option>';
+
+      let filtrados = cartonesData.filter(c => c.colorGroup && c.colorGroup.toLowerCase() === colorSeleccionado.toLowerCase());
+      
+      if (filtrados.length === 0) {
+        cartonSelect.innerHTML = '<option value="" disabled>No hay cartones cargados para este color</option>';
+        return;
+      }
+
+      filtrados.forEach((c) => {
+        // Buscamos su índice real en cartonesData
+        const realIndex = cartonesData.indexOf(c);
+        const opt = document.createElement("option");
+        opt.value = realIndex;
+        opt.innerText = c.id;
+        cartonSelect.appendChild(opt);
+      });
+    }
+
+    let indiceCartonJugadorActual = null;
+
+    function cargarCartonJugador() {
+      const selectIndex = document.getElementById("playerCartonSelect").value;
+      if (selectIndex === "") {
+        alert("Por favor selecciona un cartón válido.");
+        return;
+      }
+      indiceCartonJugadorActual = parseInt(selectIndex);
+      renderizarCartonJugadorActual();
+    }
+
+    function renderizarCartonJugadorActual() {
+      const area = document.getElementById("playerCardDisplayArea");
+      if (indiceCartonJugadorActual === null || !cartonesData[indiceCartonJugadorActual]) {
+        area.innerHTML = "";
+        return;
+      }
+
+      const carton = cartonesData[indiceCartonJugadorActual];
+      const status = comprobarSiGanoCarton(carton);
+      const colorTema = carton.borderColor || "#e91e63";
+
+      let gridHtml = `<div class="bingo-grid">`;
+      const letras = ["B", "I", "N", "G", "O"];
+      letras.forEach(l => {
+        gridHtml += `<div class="header-cell" style="background-color: ${status.gano ? 'var(--winner-gold)' : colorTema}">${l}</div>`;
+      });
+
+      for (let r = 0; r < 5; r++) {
+        for (let col = 0; col < 5; col++) {
+          const val = (carton.matrix && carton.matrix[col] && carton.matrix[col][r] !== undefined) ? carton.matrix[col][r] : 0;
+          
+          if (r === 2 && col === 2) {
+            gridHtml += `<div class="cell free">★</div>`;
+          } else if (val === null || val === 0 || val === ".es" || val === "LIBRE") {
+            gridHtml += `<div class="cell free">★</div>`;
+          } else {
+            const numVal = parseInt(val);
+            const isMarked = numerosCantados.has(numVal);
+            gridHtml += `<div class="cell ${isMarked ? 'marked' : ''}" onclick="agregarNumeroDirecto(${numVal})">${numVal}</div>`;
+          }
+        }
+      }
+      gridHtml += `</div>`;
+
+      area.innerHTML = `
+        <div class="player-card-view">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="margin: 0; color: ${colorTema};">${carton.id}</h3>
+            ${status.gano ? '<span style="background: var(--winner-gold); color: white; padding: 4px 8px; border-radius: 6px; font-weight: bold;">¡¡BINGO!! 🎉</span>' : '<span style="font-size: 0.8rem; color: #666;">Toca un número para marcarlo</span>'}
+          </div>
+          ${gridHtml}
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>
