@@ -88,19 +88,17 @@
         /* Estilos para el Modo Lado a Lado en Móviles */
         body.side-by-side-mobile #main-container-layout {
             display: grid !important;
-            grid-template-columns: 1fr 1fr !important;
-            gap: 8px !important;
+            grid-template-columns: 4fr 6fr !important; /* Tablero maestro más estilizado y cartones más anchos */
+            gap: 6px !important;
             padding: 4px !important;
+            align-items: start !important;
         }
-        body.side-by-side-mobile #main-container-layout > section {
-            grid-column: span 1 !important;
+        body.side-by-side-mobile #master-board-section {
+            max-width: 100% !important;
         }
-        body.side-by-side-mobile .cards-horizontal-container {
-            grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
-            max-height: 40vh !important;
-        }
-        body.side-by-side-mobile h1 span:nth-child(2) {
-            display: none;
+        body.side-by-side-mobile #master-board-section .grid-cols-5 button {
+            height: 1.25rem !important; /* Ajusta ligeramente la altura de las celdas del maestro para que no requieran tanto scroll vertical */
+            font-size: 8px !important;
         }
     </style>
 </head>
