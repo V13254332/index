@@ -1146,9 +1146,17 @@
             window.initActiveCards();
         }
 
-        window.applyCardSelection = function() {
+       window.applyCardSelection = function() {
             window.closeCardSelectorModal();
             window.initActiveCards();
+
+            // Sincronizar automáticamente las bolas ya cantadas con los nuevos cartones agregados
+            window.masterMarkedNumbers.forEach(num => {
+                window.autoMarkNumberOnCards(num);
+            });
+
+            window.renderPlayerCards();
+            window.checkAllCardsForWins();
         }
 
         window.removeActiveCard = function(id) {
