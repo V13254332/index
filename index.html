@@ -66,7 +66,15 @@
         }
         .bingo-cell-marked-celeste { background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%) !important; color: white !important; border-color: #7dd3fc !important; transform: scale(0.95); box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
         .bingo-cell-marked-red { background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important; color: white !important; border-color: #f87171 !important; transform: scale(0.95); box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
-        .master-cell-marked { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important; color: white !important; border-color: #4338ca !important; box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3); }
+       .master-cell-marked, .master-cell-marked-indigo { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important; color: white !important; border-color: #4338ca !important; box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3); }
+        .master-cell-marked-emerald { background: linear-gradient(135deg, #059669 0%, #047857 100%) !important; color: white !important; border-color: #34d399 !important; box-shadow: 0 2px 4px rgba(5, 150, 105, 0.4); }
+        .master-cell-marked-purple { background: linear-gradient(135deg, #9333ea 0%, #7e22ce 100%) !important; color: white !important; border-color: #c084fc !important; box-shadow: 0 2px 4px rgba(147, 51, 234, 0.4); }
+        .master-cell-marked-blue { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important; color: white !important; border-color: #60a5fa !important; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.4); }
+        .master-cell-marked-rose { background: linear-gradient(135deg, #db2777 0%, #be185d 100%) !important; color: white !important; border-color: #f472b6 !important; box-shadow: 0 2px 4px rgba(219, 39, 119, 0.4); }
+        .master-cell-marked-orange { background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%) !important; color: white !important; border-color: #fb923c !important; box-shadow: 0 2px 4px rgba(234, 88, 12, 0.4); }
+        .master-cell-marked-vino { background: linear-gradient(135deg, #722F37 0%, #4A151B 100%) !important; color: white !important; border-color: #D27D7D !important; box-shadow: 0 2px 4px rgba(114, 47, 55, 0.4); }
+        .master-cell-marked-celeste { background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%) !important; color: white !important; border-color: #7dd3fc !important; box-shadow: 0 2px 4px rgba(14, 165, 233, 0.4); }
+        .master-cell-marked-red { background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important; color: white !important; border-color: #f87171 !important; box-shadow: 0 2px 4px rgba(220, 38, 38, 0.4); }
         .double-frame { border: 2px solid #6366f1; box-shadow: 0 0 0 1px #334155, 0 6px 15px -4px rgba(0, 0, 0, 0.4); }
         
         @keyframes titilarFaltanteMaestro {
@@ -395,6 +403,7 @@
             localStorage.setItem('bingo_playerNames', JSON.stringify(window.playerNames));
             localStorage.setItem('bingo_masterMarkedNumbers', JSON.stringify(Array.from(window.masterMarkedNumbers)));
             localStorage.setItem('bingo_alreadyDeclaredWins', JSON.stringify(Array.from(window.alreadyDeclaredWins)));
+            localStorage.setItem('bingo_ocultosAlertados', JSON.stringify(Array.from(window.ocultosYaAlertados)));
             localStorage.setItem('bingo_drawnHistoryArray', JSON.stringify(window.drawnHistoryArray));
         }
 
@@ -405,6 +414,7 @@
                 const p = localStorage.getItem('bingo_playerNames');
                 const masterArr = localStorage.getItem('bingo_masterMarkedNumbers');
                 const winsArr = localStorage.getItem('bingo_alreadyDeclaredWins');
+                const ocultosArr = localStorage.getItem('bingo_ocultosAlertados');
                 const histArr = localStorage.getItem('bingo_drawnHistoryArray');
 
                 if (s) window.selectedCardsIds = JSON.parse(s);
@@ -412,6 +422,7 @@
                 if (p) window.playerNames = JSON.parse(p);
                 if (masterArr) window.masterMarkedNumbers = new Set(JSON.parse(masterArr));
                 if (winsArr) window.alreadyDeclaredWins = new Set(JSON.parse(winsArr));
+                if (ocultosArr) window.ocultosYaAlertados = new Set(JSON.parse(ocultosArr));
                 if (histArr) window.drawnHistoryArray = JSON.parse(histArr);
                 return true;
             } catch(e) { return false; }
@@ -1337,6 +1348,12 @@
             }
         }
 
+       window.getActiveThemeColor = function() {
+            if (!window.selectedCardsIds || window.selectedCardsIds.length === 0) return 'indigo';
+            let firstCard = window.allAvailableCards.find(c => c.id === window.selectedCardsIds[0]);
+            return firstCard && firstCard.color ? firstCard.color : 'indigo';
+        }
+
         window.renderMasterBoard = function() {
             const container = document.getElementById('master-board-columns');
             const recentContainer = document.getElementById('recent-balls-history');
@@ -1345,6 +1362,7 @@
             const letters = ['B', 'I', 'N', 'G', 'O'];
             
             let missingNumbersSet = window.getAllMissingNumbersAcrossCards();
+            let activeColor = window.getActiveThemeColor();
             
             if (recentContainer) {
                 if (window.drawnHistoryArray.length === 0) {
@@ -1375,14 +1393,14 @@
                     let isDrawn = window.masterMarkedNumbers.has(num);
                     let isMissingForWin = missingNumbersSet.has(num) && !isDrawn;
                     
-                    let cssClass = 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white';
+                    let cssClass = 'bg-slate-100 text-slate-950 border-slate-300 hover:bg-white hover:text-black';
                     if (isDrawn) {
-                        cssClass = 'master-cell-marked';
+                        cssClass = `master-cell-marked-${activeColor}`;
                     } else if (isMissingForWin) {
                         cssClass = 'master-cell-missing';
                     }
 
-                    btn.className = `h-4 sm:h-5 flex items-center justify-center text-[9px] font-bold rounded border w-full min-w-0 ${cssClass}`;
+                    btn.className = `h-4 sm:h-5 flex items-center justify-center text-[9px] font-extrabold rounded border w-full min-w-0 ${cssClass}`;
                     btn.textContent = num;
                     btn.onclick = () => window.toggleMasterNumber(num);
                     colDiv.appendChild(btn);
@@ -1562,12 +1580,32 @@
             }
             return winningCells;
         }
+if (!window.ocultosYaAlertados) window.ocultosYaAlertados = new Set();
 
-     window.ocultosYaAlertados = new Set();
+        window.mostrarBannerAuditoriaOculta = function(ganadores) {
+            let banner = document.getElementById('banner-auditoria-oculta');
+            if (!banner) {
+                banner = document.createElement('div');
+                banner.id = 'banner-auditoria-oculta';
+                banner.style.cssText = 'position:fixed; bottom:16px; left:50%; transform:translateX(-50%); z-index:9999; width:92%; max-width:420px; background:#0f172a; border:2px solid #f59e0b; border-radius:14px; padding:12px 14px; box-shadow:0 10px 25px rgba(0,0,0,0.8); color:#fff; font-family:sans-serif;';
+                document.body.appendChild(banner);
+            }
 
-        // Audita silenciosamente todos los cartones ocultos que pertenezcan a los colores actualmente en juego
+            let itemsHtml = ganadores.map(g => 
+                `<div style="font-size:11px; margin-top:4px; color:#fde68a;">• <b>Cartón ${g.carton}</b> (${g.lote}) — Hizo: <span style="color:#34d399; font-weight:bold;">${g.modalidad}</span></div>`
+            ).join('');
+
+            banner.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:6px;">
+                    <span style="font-size:11px; font-weight:900; color:#fbbf24; text-transform:uppercase;">🕵️ Auditoría: Cartón Oculto Ganador</span>
+                    <button onclick="document.getElementById('banner-auditoria-oculta').style.display='none'" style="background:#ef4444; color:#fff; border:none; border-radius:6px; padding:2px 8px; font-size:11px; font-weight:bold; cursor:pointer;">Cerrar</button>
+                </div>
+                <div style="max-height:140px; overflow-y:auto; margin-top:4px;">${itemsHtml}</div>
+            `;
+            banner.style.display = 'block';
+        };
+
         window.auditarColoresEnJuego = function() {
-            // 1. Detectar automáticamente qué colores están activos en la mesa
             let coloresEnJuego = new Set();
             window.selectedCardsIds.forEach(id => {
                 let card = window.allAvailableCards.find(c => c.id === id);
@@ -1576,19 +1614,15 @@
                 }
             });
 
-            // Si no hay ningún cartón seleccionado en la mesa, no audita nada
             if (coloresEnJuego.size === 0) return;
 
             let resultadosGanadores = [];
             let resultadosAPique = [];
 
-            // 2. Revisar solo los cartones ocultos que coincidan con el color en juego
             window.allAvailableCards.forEach(card => {
                 let cardColor = (card.color || '').toLowerCase().trim();
                 
                 if (coloresEnJuego.has(cardColor) && !window.selectedCardsIds.includes(card.id)) {
-                    
-                    // Construir marcas virtuales con las balotas cantadas en el tablero maestro
                     let marcasVirtuales = { "2-2": true };
                     for (let r = 0; r < 5; r++) {
                         for (let c = 0; c < 5; c++) {
@@ -1599,12 +1633,10 @@
                         }
                     }
 
-                    // Evaluar cada modalidad activa
                     for (let mKey in window.gameModes) {
                         let mode = window.gameModes[mKey];
                         if (!mode.active) continue;
 
-                        // Verificar si está A PIQUE
                         let faltantes = window.getMissingCellsForMode(card, marcasVirtuales, mKey);
                         if (faltantes.length === 1) {
                             let pos = faltantes[0];
@@ -1616,7 +1648,6 @@
                             });
                         }
 
-                        // Verificar si GANÓ la modalidad
                         let gano = false;
                         if (mKey === 'blackout') {
                             gano = [0,1,2,3,4].every(r => [0,1,2,3,4].every(c => marcasVirtuales[`${r}-${c}`]));
@@ -1634,7 +1665,7 @@
                         }
 
                         if (gano) {
-                            let claveUnica = `${card.id}_${mode.name}`;
+                            let claveUnica = `${Number(card.id)}_${mKey}`;
                             if (!window.ocultosYaAlertados.has(claveUnica)) {
                                 window.ocultosYaAlertados.add(claveUnica);
                                 resultadosGanadores.push({
@@ -1655,7 +1686,8 @@
             if (resultadosGanadores.length > 0) {
                 let mensaje = resultadosGanadores.map(g => `• Cartón ${g.carton} (${g.lote}) — Hizo: ${g.modalidad}`).join('\n');
                 console.warn(`¡GANADOR OCULTO DETECTADO!\n${mensaje}`);
-                alert(`🕵️ ALERTA DE AUDITORÍA OCULTA:\n\n${mensaje}`);
+                window.mostrarBannerAuditoriaOculta(resultadosGanadores);
+                window.guardarEstadoEnLocalStorage();
             }
         };
 
@@ -1812,11 +1844,10 @@
                     let isDrawn = window.masterMarkedNumbers.has(num);
                     let isMissing = missingNumbersSet.has(num) && !isDrawn;
 
-                    let cssClass = 'bg-slate-950 text-slate-400 border-slate-800 hover:border-indigo-500 hover:text-white';
+                 let activeColor = window.getActiveThemeColor();
+                    let cssClass = 'bg-slate-100 text-slate-950 border-slate-300 hover:bg-white hover:text-black';
                     if (isDrawn) {
-                        cssClass = 'master-cell-marked text-white';
-                    } else if (isMissing) {
-                        cssClass = 'master-cell-missing';
+                        cssClass = `master-cell-marked-${activeColor} text-white`;
                     }
 
                     btn.className = `h-7 sm:h-8 flex items-center justify-center text-xs sm:text-sm font-black rounded-md border transition-all ${cssClass}`;
