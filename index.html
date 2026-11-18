@@ -164,6 +164,9 @@
                 <i class="fa-solid fa-person-chalkboard"></i> <span>Proyector</span>
             </button>
 
+<button id="btn-voice-control" onclick="toggleVoiceControl()" class="bg-violet-600/30 hover:bg-violet-600/50 text-violet-300 border border-violet-500/40 px-2 py-1 rounded-lg text-[10px] font-semibold transition flex items-center gap-1 shadow-sm" title="Activar Control por Voz">
+    <i class="fa-solid fa-microphone-slash" id="voice-icon"></i> <span class="hidden xs:inline sm:inline" id="voice-text">Voz: OFF</span>
+</button>
             <button onclick="downloadApp()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 p-1.5 rounded-lg text-[10px] font-semibold transition border border-slate-600" title="Descargar App">
                 <i class="fa-solid fa-download text-indigo-400"></i>
             </button>
@@ -1890,6 +1893,98 @@ window.renderProjectorBoard = function() {
             a.click();
             URL.revokeObjectURL(url);
         }
+
+// Variables para el reconocimiento de voz
+        window.recognitionInstance = null;
+        window.isVoiceActive = false;
+
+        window.toggleVoiceControl = function() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            if (!SpeechRecognition) {
+                alert("Tu navegador no soporta reconocimiento de voz. Prueba usando Google Chrome.");
+                return;
+            }
+
+            const btn = document.getElementById('btn-voice-control');
+            const icon = document.getElementById('voice-icon');
+            const txt = document.getElementById('voice-text');
+
+            if (window.isVoiceActive) {
+                // Apagar
+                if (window.recognitionInstance) {
+                    window.recognitionInstance.stop();
+                }
+                window.isVoiceActive = false;
+                btn.className = "bg-violet-600/30 hover:bg-violet-600/50 text-violet-300 border border-violet-500/40 px-2 py-1 rounded-lg text-[10px] font-semibold transition flex items-center gap-1 shadow-sm";
+                icon.className = "fa-solid fa-microphone-slash";
+                txt.textContent = "Voz: OFF";
+            } else {
+                // Encender
+                try {
+                    window.recognitionInstance = new SpeechRecognition();
+                    window.recognitionInstance.lang = 'es-ES'; // Idioma español
+                    window.recognitionInstance.continuous = true;
+                    window.recognitionInstance.interimResults = false;
+
+                    window.recognitionInstance.onstart = function() {
+                        window.isVoiceActive = true;
+                        btn.className = "bg-emerald-600 text-white border border-emerald-400 px-2 py-1 rounded-lg text-[10px] font-semibold transition flex items-center gap-1 shadow-sm animate-pulse";
+                        icon.className = "fa-solid fa-microphone";
+                        txt.textContent = "Escuchando...";
+                    };
+
+                    window.recognitionInstance.onresult = function(event) {
+                        const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
+                        console.log("Voz captada:", transcript);
+                        window.processVoiceCommand(transcript);
+                    };
+
+                    window.recognitionInstance.onerror = function(event) {
+                        console.error("Error de voz:", event.error);
+                    };
+
+                    window.recognitionInstance.onend = function() {
+                        // Si seguía activo y se cortó por silencio, lo reiniciamos automáticamente
+                        if (window.isVoiceActive) {
+                            try { window.recognitionInstance.start(); } catch(e){}
+                        }
+                    };
+
+                    window.recognitionInstance.start();
+                } catch(e) {
+                    console.error("No se pudo iniciar la voz:", e);
+                    alert("No se pudo acceder al micrófono.");
+                }
+            }
+        };
+
+        window.processVoiceCommand = function(text) {
+            // Limpiamos el texto para extraer números (ej: "B 12", "número 15", "bicolor 30", o solo "12")
+            // Buscamos cualquier número del 1 al 75 mencionado
+            const cleanedText = text.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // Quitar acentos
+            
+            // Expresión regular para buscar números aislados
+            const matches = cleanedText.match(/\d+/g);
+            
+            if (matches && matches.length > 0) {
+                let num = parseInt(matches[0], 10);
+                if (num >= 1 && num <= 75) {
+                    // ¡Número válido de bingo! Ejecutamos el toggle tal cual si hicieras clic
+                    window.toggleMasterNumber(num);
+                    
+                    // Efecto visual rápido o feedback de audio opcional
+                    console.log(`¡Voz marcó el número: ${num}!`);
+                }
+            } else {
+                // Comandos especiales por voz opcionales
+                if (cleanedText.includes("reiniciar") || cleanedText.includes("nuevo juego")) {
+                    if (confirm("¿Reiniciar juego por comando de voz?")) {
+                        window.resetGame();
+                    }
+                }
+            }
+        };
     </script>
 </body>
 </html>
