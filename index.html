@@ -11,12 +11,14 @@
     <!-- Google Fonts Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+        if (typeof tailwind !== 'undefined') {
+            tailwind.config = {
+                theme: {
+                    extend: {
+                        fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    }
                 }
-            }
+            };
         }
     </script>
     <style>
@@ -66,7 +68,7 @@
         }
         .bingo-cell-marked-celeste { background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%) !important; color: white !important; border-color: #7dd3fc !important; transform: scale(0.95); box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
         .bingo-cell-marked-red { background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important; color: white !important; border-color: #f87171 !important; transform: scale(0.95); box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
-       .master-cell-marked, .master-cell-marked-indigo { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important; color: white !important; border-color: #4338ca !important; box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3); }
+        .master-cell-marked, .master-cell-marked-indigo { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important; color: white !important; border-color: #4338ca !important; box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3); }
         .master-cell-marked-emerald { background: linear-gradient(135deg, #059669 0%, #047857 100%) !important; color: white !important; border-color: #34d399 !important; box-shadow: 0 2px 4px rgba(5, 150, 105, 0.4); }
         .master-cell-marked-purple { background: linear-gradient(135deg, #9333ea 0%, #7e22ce 100%) !important; color: white !important; border-color: #c084fc !important; box-shadow: 0 2px 4px rgba(147, 51, 234, 0.4); }
         .master-cell-marked-blue { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important; color: white !important; border-color: #60a5fa !important; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.4); }
@@ -77,12 +79,12 @@
         .master-cell-marked-red { background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important; color: white !important; border-color: #f87171 !important; box-shadow: 0 2px 4px rgba(220, 38, 38, 0.4); }
         .double-frame { border: 2px solid #6366f1; box-shadow: 0 0 0 1px #334155, 0 6px 15px -4px rgba(0, 0, 0, 0.4); }
         
-        @keyframes titilarFaltanteMaestro {
-          0% { background-color: #f59e0b; border-color: #fef08a; transform: scale(1); box-shadow: 0 0 6px #f59e0b; color: #0f172a; }
-          50% { background-color: #b45309; border-color: #fde68a; transform: scale(1.06); box-shadow: 0 0 12px #fbbf24; color: #ffffff; }
-          100% { background-color: #f59e0b; border-color: #fef08a; transform: scale(1); box-shadow: 0 0 6px #f59e0b; color: #0f172a; }
-        }
-        .master-cell-missing { animation: titilarFaltanteMaestro 0.8s infinite ease-in-out !important; font-weight: 900 !important; z-index: 10; }
+       @keyframes titilarFaltanteMaestro {
+  0% { background-color: #f59e0b; border-color: #fef08a; transform: scale(1); box-shadow: 0 0 6px #f59e0b; color: #0f172a; }
+  50% { background-color: #b45309; border-color: #fde68a; transform: scale(1.06); box-shadow: 0 0 12px #fbbf24; color: #ffffff; }
+  100% { background-color: #f59e0b; border-color: #fef08a; transform: scale(1); box-shadow: 0 0 6px #f59e0b; color: #0f172a; }
+}
+.master-cell-missing { animation: titilarFaltanteMaestro 0.8s infinite ease-in-out !important; font-weight: 900 !important; z-index: 10; }
 
         .cards-horizontal-container {
             display: grid;
@@ -387,6 +389,7 @@
         window.playerNames = {}; 
         window.masterMarkedNumbers = new Set();
         window.alreadyDeclaredWins = new Set();
+        window.ocultosYaAlertados = new Set();
         window.drawnHistoryArray = [];
 
         window.gameModes = {
@@ -464,7 +467,387 @@
             localStorage.setItem('bingo_custom_gameModes', JSON.stringify(serializable));
         }
 
-        async function cargarCartonesDesdeFirebase() {
+        window.changeBackgroundTheme = function(theme) {
+            const body = document.body;
+            body.className = body.className.replace(/bg-\[#2B0D12\]|bg-emerald-950|bg-purple-950|bg-slate-950/g, '');
+            if (theme === 'vino') body.classList.add('bg-[#2B0D12]');
+            else if (theme === 'emerald') body.classList.add('bg-emerald-950');
+            else if (theme === 'purple') body.classList.add('bg-purple-950');
+            else body.classList.add('bg-slate-950');
+            localStorage.setItem('bingo_bg_theme', theme);
+        }
+
+        window.getActiveThemeColor = function() {
+            if (!window.selectedCardsIds || window.selectedCardsIds.length === 0) return 'indigo';
+            let firstCard = window.allAvailableCards.find(c => c.id === window.selectedCardsIds[0]);
+            return firstCard && firstCard.color ? firstCard.color : 'indigo';
+        }
+
+window.renderMasterBoard = function() {
+            const container = document.getElementById('master-board-columns');
+            const recentContainer = document.getElementById('recent-balls-history');
+            if (!container) return;
+            container.innerHTML = '';
+            const letters = ['B', 'I', 'N', 'G', 'O'];
+            
+            let missingNumbersSet = window.getAllMissingNumbersAcrossCards();
+            let activeColor = window.getActiveThemeColor();
+            
+            if (recentContainer) {
+                if (window.drawnHistoryArray.length === 0) {
+                    recentContainer.innerHTML = `<span class="text-[9px] text-slate-500 italic">Sin bolas</span>`;
+                } else {
+                    recentContainer.innerHTML = '';
+                    let ultimas = window.drawnHistoryArray.slice(-6).reverse();
+                    ultimas.forEach(num => {
+                        let span = document.createElement('span');
+                        span.className = "bg-indigo-600 text-white font-black px-1.5 py-0.2 rounded text-[9px] shadow-sm shrink-0";
+                        span.textContent = num;
+                        recentContainer.appendChild(span);
+                    });
+                }
+            }
+
+            for (let col = 0; col < 5; col++) {
+                const colDiv = document.createElement('div');
+                colDiv.className = 'flex flex-col gap-0.5 min-w-0';
+                colDiv.innerHTML = `<div class="bg-indigo-600 text-white font-bold text-center text-[9px] py-0.5 rounded">${letters[col]}</div>`;
+               
+                for (let row = 1; row <= 15; row++) {
+                    const num = col * 15 + row;
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.id = `master-num-${num}`;
+                    
+                    let isDrawn = window.masterMarkedNumbers.has(num);
+                    let isMissingForWin = missingNumbersSet.has(num) && !isDrawn;
+                    
+                    let cssClass = 'bg-slate-100 text-slate-950 border-slate-300 hover:bg-white hover:text-black';
+                    if (isDrawn) {
+                        cssClass = `master-cell-marked-${activeColor}`;
+                    } else if (isMissingForWin) {
+                        cssClass = 'master-cell-missing';
+                    }
+
+                    btn.className = `h-4 sm:h-5 flex items-center justify-center text-[9px] font-extrabold rounded border w-full min-w-0 ${cssClass}`;
+                    btn.textContent = num;
+                    btn.onclick = () => window.toggleMasterNumber(num);
+                    colDiv.appendChild(btn);
+                }
+                container.appendChild(colDiv);
+            }
+            window.updateDrawnCountBadge();
+        }
+
+        window.updateDrawnCountBadge = function() {
+            const badge = document.getElementById('drawn-count-badge');
+            if (badge) badge.textContent = `${window.masterMarkedNumbers.size} cantados`;
+        }
+
+        window.getAllMissingNumbersAcrossCards = function() {
+            let missingNumbersSet = new Set();
+            window.selectedCardsIds.forEach(id => {
+                let card = window.allAvailableCards.find(c => c.id === id);
+                if (!card) return;
+                let marks = window.cardMarks[card.id] || {};
+
+                for (let mKey in window.gameModes) {
+                    let mode = window.gameModes[mKey];
+                    if (!mode.active) continue;
+                    let missing = window.getMissingCellsForMode(card, marks, mKey);
+                    if (missing.length === 1) {
+                        missing.forEach(pos => {
+                            let num = card.numbers[pos.r][pos.c];
+                            if (typeof num === 'number') missingNumbersSet.add(num);
+                        });
+                    }
+                }
+            });
+            return missingNumbersSet;
+        }
+
+        window.getMissingCellsForMode = function(card, marks, modeKey) {
+            let missing = [];
+            let mode = window.gameModes[modeKey];
+            if (!mode) return missing;
+
+            if (modeKey === 'blackout') {
+                for (let r = 0; r < 5; r++) {
+                    for (let c = 0; c < 5; c++) {
+                        if (!marks[`${r}-${c}`]) missing.push({r, c});
+                    }
+                }
+            } else if (modeKey === 'diagonal') {
+                let d1Unmarked = [];
+                for (let i = 0; i < 5; i++) { if (!marks[`${i}-${i}`]) d1Unmarked.push({r: i, c: i}); }
+                let d2Unmarked = [];
+                for (let i = 0; i < 5; i++) { if (!marks[`${i}-${4-i}`]) d2Unmarked.push({r: i, c: 4-i}); }
+                if (d1Unmarked.length === 1) missing.push(d1Unmarked[0]);
+                if (d2Unmarked.length === 1) missing.push(d2Unmarked[0]);
+            } else if (modeKey === 'horizontal') {
+                for (let r = 0; r < 5; r++) {
+                    let rowUnmarked = [];
+                    for (let c = 0; c < 5; c++) { if (!marks[`${r}-${c}`]) rowUnmarked.push({r, c}); }
+                    if (rowUnmarked.length === 1) missing.push(rowUnmarked[0]);
+                }
+            } else if (modeKey === 'vertical') {
+                for (let c = 0; c < 5; c++) {
+                    let colUnmarked = [];
+                    for (let r = 0; r < 5; r++) { if (!marks[`${r}-${c}`]) colUnmarked.push({r, c}); }
+                    if (colUnmarked.length === 1) missing.push(colUnmarked[0]);
+                }
+            } else if (modeKey === 'corners') {
+                let corners = [{r:0, c:0}, {r:0, c:4}, {r:4, c:0}, {r:4, c:4}];
+                let unmar = corners.filter(pos => !marks[`${pos.r}-${pos.c}`]);
+                if (unmar.length === 1) missing.push(unmar[0]);
+            } else {
+                let patternUnmarked = [];
+                for (let r = 0; r < 5; r++) {
+                    for (let c = 0; c < 5; c++) {
+                        if (mode.isCellInPattern(r, c) && !marks[`${r}-${c}`]) {
+                            patternUnmarked.push({r, c});
+                        }
+                    }
+                }
+                if (patternUnmarked.length === 1) {
+                    missing.push(patternUnmarked[0]);
+                }
+            }
+            return missing;
+        }
+
+        window.toggleMasterNumber = function(num) {
+            if (window.masterMarkedNumbers.has(num)) {
+                window.masterMarkedNumbers.delete(num);
+                window.autoUnmarkNumberOnCards(num);
+                window.drawnHistoryArray = window.drawnHistoryArray.filter(n => n !== num);
+            } else {
+                window.masterMarkedNumbers.add(num);
+                window.autoMarkNumberOnCards(num);
+                if (!window.drawnHistoryArray.includes(num)) {
+                    window.drawnHistoryArray.push(num);
+                }
+            }
+            
+            window.renderMasterBoard();
+            window.renderPlayerCards();
+            window.checkAllCardsForWins();
+            window.auditarColoresEnJuego();
+            window.guardarEstadoEnLocalStorage();
+        };
+
+        window.autoMarkNumberOnCards = function(num) {
+            window.selectedCardsIds.forEach(id => {
+                let card = window.allAvailableCards.find(c => c.id === id);
+                if (!card) return;
+                for (let r = 0; r < 5; r++) {
+                    for (let col = 0; col < 5; col++) {
+                        if (card.numbers[r][col] === num) {
+                            if (!window.cardMarks[card.id]) window.cardMarks[card.id] = {};
+                            window.cardMarks[card.id][`${r}-${col}`] = true;
+                        }
+                    }
+                }
+            });
+        }
+
+        window.autoUnmarkNumberOnCards = function(num) {
+            window.selectedCardsIds.forEach(id => {
+                let card = window.allAvailableCards.find(c => c.id === id);
+                if (!card) return;
+                for (let r = 0; r < 5; r++) {
+                    for (let col = 0; col < 5; col++) {
+                        if (card.numbers[r][col] === num) {
+                            if (window.cardMarks[card.id]) window.cardMarks[card.id][`${r}-${col}`] = false;
+                        }
+                    }
+                }
+            });
+        }
+
+        window.renderPlayerCards = function() {
+            let nearWinContainer = document.getElementById('near-win-cards-container');
+            let nearWinCountBadge = document.getElementById('near-win-count-badge');
+            let nearWinListHTML = '';
+            let totalNearWinCount = 0;
+
+            window.selectedCardsIds.forEach(id => {
+                let card = window.allAvailableCards.find(c => c.id === id);
+                if (!card) return;
+                let cfg = window.getCardColorConfig(card.color);
+                let marks = window.cardMarks[card.id] || {};
+                let pName = window.playerNames[card.id] || "";
+
+                let missingCellsMap = {};
+                
+                for (let mKey in window.gameModes) {
+                    let mode = window.gameModes[mKey];
+                    if (!mode.active) continue;
+                    let missing = window.getMissingCellsForMode(card, marks, mKey);
+                    if (missing.length === 1) {
+                        missing.forEach(pos => {
+                            missingCellsMap[`${pos.r}-${pos.c}`] = true;
+                            totalNearWinCount++;
+                            nearWinListHTML += `<div class="text-[9px] bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-0.5 text-amber-300 flex justify-between items-center gap-1 min-w-0">
+                                <span class="truncate"><b>${card.title}</b> ${pName ? '('+pName+')' : ''} <span class="text-indigo-300">[${mode.name}]</span></span>
+                                <span class="bg-amber-500 text-slate-950 font-bold px-1 rounded text-[8.5px] shrink-0">Falta: ${card.numbers[pos.r][pos.c]}</span>
+                            </div>`;
+                        });
+                    }
+                }
+
+                for (let r = 0; r < 5; r++) {
+                    for (let col = 0; col < 5; col++) {
+                        let val = card.numbers[r][col];
+                        let btn = document.getElementById(`cell-${card.id}-${r}-${col}`);
+                        if (!btn) continue;
+                        if (val === "FREE") continue;
+
+                        let isMarked = marks[`${r}-${col}`];
+                        let isMissing = missingCellsMap[`${r}-${col}`];
+
+                        if (isMarked) {
+                            btn.className = `active-card-cell h-6 sm:h-7 rounded text-[10px] sm:text-[11px] font-bold flex items-center justify-center border min-w-0 ${cfg.markedClass}`;
+                        } else if (isMissing) {
+                            btn.className = `active-card-cell h-6 sm:h-7 rounded text-[10px] sm:text-[11px] font-bold flex items-center justify-center border min-w-0 bg-amber-500 text-slate-950 animate-pulse font-extrabold`;
+                        } else {
+                            btn.className = `active-card-cell h-6 sm:h-7 rounded text-[10px] sm:text-[11px] font-bold flex items-center justify-center border min-w-0 bg-slate-800 text-slate-200 border-slate-700`;
+                        }
+                    }
+                }
+            });
+
+            if (nearWinContainer) {
+                nearWinContainer.innerHTML = nearWinListHTML || `<div class="text-[9px] text-slate-400 text-center py-1.5 italic">Ninguno a pique...</div>`;
+            }
+            if (nearWinCountBadge) {
+                nearWinCountBadge.textContent = `${totalNearWinCount}`;
+            }
+
+            window.renderMasterBoard();
+            if (!document.getElementById('projector-modal').classList.contains('hidden')) {
+                window.renderProjectorBoard();
+            }
+        }
+
+        window.auditarColoresEnJuego = function() {
+            let coloresEnJuego = new Set();
+            window.selectedCardsIds.forEach(id => {
+                let card = window.allAvailableCards.find(c => c.id === id);
+                if (card && card.color) {
+                    coloresEnJuego.add(card.color.toLowerCase().trim());
+                }
+            });
+
+            if (coloresEnJuego.size === 0) return;
+
+            let resultadosGanadores = [];
+            let ganadoresActualesSignaturas = new Set();
+
+            window.allAvailableCards.forEach(card => {
+                let cardColor = (card.color || '').toLowerCase().trim();
+                
+                if (coloresEnJuego.has(cardColor) && !window.selectedCardsIds.includes(card.id)) {
+                    let marcasVirtuales = { "2-2": true };
+                    for (let r = 0; r < 5; r++) {
+                        for (let c = 0; c < 5; c++) {
+                            let val = card.numbers[r][c];
+                            if (typeof val === 'number' && window.masterMarkedNumbers.has(val)) {
+                                marcasVirtuales[`${r}-${c}`] = true;
+                            }
+                        }
+                    }
+
+                    for (let mKey in window.gameModes) {
+                        let mode = window.gameModes[mKey];
+                        if (!mode.active) continue;
+
+                        let gano = false;
+                        if (mKey === 'blackout') {
+                            gano = [0,1,2,3,4].every(r => [0,1,2,3,4].every(c => marcasVirtuales[`${r}-${c}`]));
+                        } else if (mKey === 'diagonal') {
+                            gano = [0,1,2,3,4].every(i => marcasVirtuales[`${i}-${i}`]) || 
+                                   [0,1,2,3,4].every(i => marcasVirtuales[`${i}-${4-i}`]);
+                        } else if (mKey === 'horizontal') {
+                            gano = [0,1,2,3,4].some(r => [0,1,2,3,4].every(c => marcasVirtuales[`${r}-${c}`]));
+                        } else if (mKey === 'vertical') {
+                            gano = [0,1,2,3,4].some(c => [0,1,2,3,4].every(r => marcasVirtuales[`${r}-${c}`]));
+                        } else if (mKey === 'corners') {
+                            gano = marcasVirtuales['0-0'] && marcasVirtuales['0-4'] && marcasVirtuales['4-0'] && marcasVirtuales['4-4'];
+                        } else {
+                            gano = [0,1,2,3,4].every(r => [0,1,2,3,4].every(c => !mode.isCellInPattern(r, c) || marcasVirtuales[`${r}-${c}`]));
+                        }
+
+                        if (gano) {
+                            let claveUnica = `${Number(card.id)}_${mKey}`;
+                            ganadoresActualesSignaturas.add(claveUnica);
+
+                            if (!window.ocultosYaAlertados.has(claveUnica)) {
+                                window.ocultosYaAlertados.add(claveUnica);
+                                resultadosGanadores.push({
+                                    carton: card.title,
+                                    lote: card.batch,
+                                    modalidad: mode.name
+                                });
+                            }
+                        }
+                    }
+                }
+            });
+
+            for (let sig of window.ocultosYaAlertados) {
+                if (!ganadoresActualesSignaturas.has(sig)) {
+                    window.ocultosYaAlertados.delete(sig);
+                }
+            }
+
+            if (resultadosGanadores.length > 0) {
+                let mensaje = resultadosGanadores.map(g => `• Cartón ${g.carton} (${g.lote}) — Hizo: ${g.modalidad}`).join('\n');
+                console.warn(`¡GANADOR OCULTO DETECTADO!\n${mensaje}`);
+                window.mostrarBannerAuditoriaOculta(resultadosGanadores);
+                window.guardarEstadoEnLocalStorage();
+            }
+        };
+
+        window.mostrarBannerAuditoriaOculta = function(ganadores) {
+            let banner = document.getElementById('banner-auditoria-oculta');
+            if (!banner) {
+                banner = document.createElement('div');
+                banner.id = 'banner-auditoria-oculta';
+                banner.style.cssText = 'position:fixed; bottom:16px; left:50%; transform:translateX(-50%); z-index:9999; width:92%; max-width:420px; background:#0f172a; border:2px solid #f59e0b; border-radius:14px; padding:12px 14px; box-shadow:0 10px 25px rgba(0,0,0,0.8); color:#fff; font-family:sans-serif;';
+                document.body.appendChild(banner);
+            }
+
+            let itemsHtml = ganadores.map(g => 
+                `<div style="font-size:11px; margin-top:4px; color:#fde68a;">• <b>Cartón ${g.carton}</b> (${g.lote}) — Hizo: <span style="color:#34d399; font-weight:bold;">${g.modalidad}</span></div>`
+            ).join('');
+
+            banner.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:6px;">
+                    <span style="font-size:11px; font-weight:900; color:#fbbf24; text-transform:uppercase;">🕵️ Auditoría: Cartón Oculto Ganador</span>
+                    <button onclick="document.getElementById('banner-auditoria-oculta').style.display='none'" style="background:#ef4444; color:#fff; border:none; border-radius:6px; padding:2px 8px; font-size:11px; font-weight:bold; cursor:pointer;">Cerrar</button>
+                </div>
+                <div style="max-height:140px; overflow-y:auto; margin-top:4px;">${itemsHtml}</div>
+            `;
+            banner.style.display = 'block';
+        };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('bingo_bg_theme') || 'dark';
+            document.getElementById('bg-theme-selector').value = savedTheme;
+            window.changeBackgroundTheme(savedTheme);
+            
+            if (localStorage.getItem('bingo_side_by_side') === 'true') {
+                document.body.classList.add('side-by-side-mobile');
+            }
+
+            window.cargarEstadoDesdeLocalStorage();
+            window.renderMasterBoard();
+            window.initModalitiesList();
+            cargarCartonesDesdeFirebase();
+        });
+
+async function cargarCartonesDesdeFirebase() {
             try {
                 await signInAnonymously(auth);
                 const dbRef = ref(db);
@@ -620,21 +1003,6 @@
                 console.error("Error al cargar cartones desde la raíz:", error);
             }
         }
-
-        window.addEventListener('DOMContentLoaded', () => {
-            const savedTheme = localStorage.getItem('bingo_bg_theme') || 'dark';
-            document.getElementById('bg-theme-selector').value = savedTheme;
-            window.changeBackgroundTheme(savedTheme);
-            
-            if (localStorage.getItem('bingo_side_by_side') === 'true') {
-                document.body.classList.add('side-by-side-mobile');
-            }
-
-            window.cargarEstadoDesdeLocalStorage();
-            window.renderMasterBoard();
-            window.initModalitiesList();
-            cargarCartonesDesdeFirebase();
-        });
     </script>
 
     <!-- Script de Interfaz y UI Global -->
@@ -890,16 +1258,6 @@
             window.renderMasterBoard();
             window.renderPlayerCards();
             window.checkAllCardsForWins();
-        }
-
-        window.changeBackgroundTheme = function(theme) {
-            const body = document.body;
-            body.className = body.className.replace(/bg-\[#2B0D12\]|bg-emerald-950|bg-purple-950|bg-slate-950/g, '');
-            if (theme === 'vino') body.classList.add('bg-[#2B0D12]');
-            else if (theme === 'emerald') body.classList.add('bg-emerald-950');
-            else if (theme === 'purple') body.classList.add('bg-purple-950');
-            else body.classList.add('bg-slate-950');
-            localStorage.setItem('bingo_bg_theme', theme);
         }
 
         window.buildCardSelectorModalList = function(filterText = "") {
@@ -1209,259 +1567,6 @@
             window.checkAllCardsForWins();
         }
 
-        window.getMissingCellsForMode = function(card, marks, modeKey) {
-            let missing = [];
-            let mode = window.gameModes[modeKey];
-            if (!mode) return missing;
-
-            if (modeKey === 'blackout') {
-                for (let r = 0; r < 5; r++) {
-                    for (let c = 0; c < 5; c++) {
-                        if (!marks[`${r}-${c}`]) missing.push({r, c});
-                    }
-                }
-            } else if (modeKey === 'diagonal') {
-                let d1Unmarked = [];
-                for (let i = 0; i < 5; i++) { if (!marks[`${i}-${i}`]) d1Unmarked.push({r: i, c: i}); }
-                let d2Unmarked = [];
-                for (let i = 0; i < 5; i++) { if (!marks[`${i}-${4-i}`]) d2Unmarked.push({r: i, c: 4-i}); }
-                if (d1Unmarked.length === 1) missing.push(d1Unmarked[0]);
-                if (d2Unmarked.length === 1) missing.push(d2Unmarked[0]);
-            } else if (modeKey === 'horizontal') {
-                for (let r = 0; r < 5; r++) {
-                    let rowUnmarked = [];
-                    for (let c = 0; c < 5; c++) { if (!marks[`${r}-${c}`]) rowUnmarked.push({r, c}); }
-                    if (rowUnmarked.length === 1) missing.push(rowUnmarked[0]);
-                }
-            } else if (modeKey === 'vertical') {
-                for (let c = 0; c < 5; c++) {
-                    let colUnmarked = [];
-                    for (let r = 0; r < 5; r++) { if (!marks[`${r}-${c}`]) colUnmarked.push({r, c}); }
-                    if (colUnmarked.length === 1) missing.push(colUnmarked[0]);
-                }
-            } else if (modeKey === 'corners') {
-                let corners = [{r:0, c:0}, {r:0, c:4}, {r:4, c:0}, {r:4, c:4}];
-                let unmar = corners.filter(pos => !marks[`${pos.r}-${pos.c}`]);
-                if (unmar.length === 1) missing.push(unmar[0]);
-            } else {
-                let patternUnmarked = [];
-                for (let r = 0; r < 5; r++) {
-                    for (let c = 0; c < 5; c++) {
-                        if (mode.isCellInPattern(r, c) && !marks[`${r}-${c}`]) {
-                            patternUnmarked.push({r, c});
-                        }
-                    }
-                }
-                if (patternUnmarked.length === 1) {
-                    missing.push(patternUnmarked[0]);
-                }
-            }
-            return missing;
-        }
-
-        window.getAllMissingNumbersAcrossCards = function() {
-            let missingNumbersSet = new Set();
-            window.selectedCardsIds.forEach(id => {
-                let card = window.allAvailableCards.find(c => c.id === id);
-                if (!card) return;
-                let marks = window.cardMarks[card.id] || {};
-
-                for (let mKey in window.gameModes) {
-                    let mode = window.gameModes[mKey];
-                    if (!mode.active) continue;
-                    let missing = window.getMissingCellsForMode(card, marks, mKey);
-                    if (missing.length === 1) {
-                        missing.forEach(pos => {
-                            let num = card.numbers[pos.r][pos.c];
-                            if (typeof num === 'number') missingNumbersSet.add(num);
-                        });
-                    }
-                }
-            });
-            return missingNumbersSet;
-        }
-
-        window.renderPlayerCards = function() {
-            let nearWinContainer = document.getElementById('near-win-cards-container');
-            let nearWinCountBadge = document.getElementById('near-win-count-badge');
-            let nearWinListHTML = '';
-            let totalNearWinCount = 0;
-
-            window.selectedCardsIds.forEach(id => {
-                let card = window.allAvailableCards.find(c => c.id === id);
-                if (!card) return;
-                let cfg = window.getCardColorConfig(card.color);
-                let marks = window.cardMarks[card.id] || {};
-                let pName = window.playerNames[card.id] || "";
-
-                let missingCellsMap = {};
-                
-                for (let mKey in window.gameModes) {
-                    let mode = window.gameModes[mKey];
-                    if (!mode.active) continue;
-                    let missing = window.getMissingCellsForMode(card, marks, mKey);
-                    if (missing.length === 1) {
-                        missing.forEach(pos => {
-                            missingCellsMap[`${pos.r}-${pos.c}`] = true;
-                            totalNearWinCount++;
-                            nearWinListHTML += `<div class="text-[9px] bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-0.5 text-amber-300 flex justify-between items-center gap-1 min-w-0">
-                                <span class="truncate"><b>${card.title}</b> ${pName ? '('+pName+')' : ''} <span class="text-indigo-300">[${mode.name}]</span></span>
-                                <span class="bg-amber-500 text-slate-950 font-bold px-1 rounded text-[8.5px] shrink-0">Falta: ${card.numbers[pos.r][pos.c]}</span>
-                            </div>`;
-                        });
-                    }
-                }
-
-                for (let r = 0; r < 5; r++) {
-                    for (let col = 0; col < 5; col++) {
-                        let val = card.numbers[r][col];
-                        let btn = document.getElementById(`cell-${card.id}-${r}-${col}`);
-                        if (!btn) continue;
-
-                        if (val === "FREE") continue;
-
-                        let isMarked = marks[`${r}-${col}`];
-                        let isMissing = missingCellsMap[`${r}-${col}`];
-
-                        if (isMarked) {
-                            btn.className = `active-card-cell h-6 sm:h-7 rounded text-[10px] sm:text-[11px] font-bold flex items-center justify-center border min-w-0 ${cfg.markedClass}`;
-                        } else if (isMissing) {
-                            btn.className = `active-card-cell h-6 sm:h-7 rounded text-[10px] sm:text-[11px] font-bold flex items-center justify-center border min-w-0 bg-amber-500 text-slate-950 animate-pulse font-extrabold`;
-                        } else {
-                            btn.className = `active-card-cell h-6 sm:h-7 rounded text-[10px] sm:text-[11px] font-bold flex items-center justify-center border min-w-0 bg-slate-800 text-slate-200 border-slate-700`;
-                        }
-                    }
-                }
-            });
-
-            if (nearWinContainer) {
-                nearWinContainer.innerHTML = nearWinListHTML || `<div class="text-[9px] text-slate-400 text-center py-1.5 italic">Ninguno a pique...</div>`;
-            }
-            if (nearWinCountBadge) {
-                nearWinCountBadge.textContent = `${totalNearWinCount}`;
-            }
-
-            window.renderMasterBoard();
-            
-            if (!document.getElementById('projector-modal').classList.contains('hidden')) {
-                window.renderProjectorBoard();
-            }
-        }
-
-       window.getActiveThemeColor = function() {
-            if (!window.selectedCardsIds || window.selectedCardsIds.length === 0) return 'indigo';
-            let firstCard = window.allAvailableCards.find(c => c.id === window.selectedCardsIds[0]);
-            return firstCard && firstCard.color ? firstCard.color : 'indigo';
-        }
-
-        window.renderMasterBoard = function() {
-            const container = document.getElementById('master-board-columns');
-            const recentContainer = document.getElementById('recent-balls-history');
-            if (!container) return;
-            container.innerHTML = '';
-            const letters = ['B', 'I', 'N', 'G', 'O'];
-            
-            let missingNumbersSet = window.getAllMissingNumbersAcrossCards();
-            let activeColor = window.getActiveThemeColor();
-            
-            if (recentContainer) {
-                if (window.drawnHistoryArray.length === 0) {
-                    recentContainer.innerHTML = `<span class="text-[9px] text-slate-500 italic">Sin bolas</span>`;
-                } else {
-                    recentContainer.innerHTML = '';
-                    let ultimas = window.drawnHistoryArray.slice(-6).reverse();
-                    ultimas.forEach(num => {
-                        let span = document.createElement('span');
-                        span.className = "bg-indigo-600 text-white font-black px-1.5 py-0.2 rounded text-[9px] shadow-sm shrink-0";
-                        span.textContent = num;
-                        recentContainer.appendChild(span);
-                    });
-                }
-            }
-
-            for (let col = 0; col < 5; col++) {
-                const colDiv = document.createElement('div');
-                colDiv.className = 'flex flex-col gap-0.5 min-w-0';
-                colDiv.innerHTML = `<div class="bg-indigo-600 text-white font-bold text-center text-[9px] py-0.5 rounded">${letters[col]}</div>`;
-               
-                for (let row = 1; row <= 15; row++) {
-                    const num = col * 15 + row;
-                    const btn = document.createElement('button');
-                    btn.type = 'button';
-                    btn.id = `master-num-${num}`;
-                    
-                    let isDrawn = window.masterMarkedNumbers.has(num);
-                    let isMissingForWin = missingNumbersSet.has(num) && !isDrawn;
-                    
-                    let cssClass = 'bg-slate-100 text-slate-950 border-slate-300 hover:bg-white hover:text-black';
-                    if (isDrawn) {
-                        cssClass = `master-cell-marked-${activeColor}`;
-                    } else if (isMissingForWin) {
-                        cssClass = 'master-cell-missing';
-                    }
-
-                    btn.className = `h-4 sm:h-5 flex items-center justify-center text-[9px] font-extrabold rounded border w-full min-w-0 ${cssClass}`;
-                    btn.textContent = num;
-                    btn.onclick = () => window.toggleMasterNumber(num);
-                    colDiv.appendChild(btn);
-                }
-                container.appendChild(colDiv);
-            }
-            window.updateDrawnCountBadge();
-        }
-
-        window.toggleMasterNumber = function(num) {
-            if (window.masterMarkedNumbers.has(num)) {
-                window.masterMarkedNumbers.delete(num);
-                window.autoUnmarkNumberOnCards(num);
-                window.drawnHistoryArray = window.drawnHistoryArray.filter(n => n !== num);
-            } else {
-                window.masterMarkedNumbers.add(num);
-                window.autoMarkNumberOnCards(num);
-                if (!window.drawnHistoryArray.includes(num)) {
-                    window.drawnHistoryArray.push(num);
-                }
-            }
-            
-            window.renderMasterBoard();
-            window.renderPlayerCards();
-            window.checkAllCardsForWins();
-            
-            // Auditoría oculta automática de los colores actualmente en juego
-            window.auditarColoresEnJuego();
-            
-            window.guardarEstadoEnLocalStorage();
-        };
-
-        window.autoMarkNumberOnCards = function(num) {
-            window.selectedCardsIds.forEach(id => {
-                let card = window.allAvailableCards.find(c => c.id === id);
-                if (!card) return;
-                for (let r = 0; r < 5; r++) {
-                    for (let col = 0; col < 5; col++) {
-                        if (card.numbers[r][col] === num) {
-                            if (!window.cardMarks[card.id]) window.cardMarks[card.id] = {};
-                            window.cardMarks[card.id][`${r}-${col}`] = true;
-                        }
-                    }
-                }
-            });
-        }
-
-        window.autoUnmarkNumberOnCards = function(num) {
-            window.selectedCardsIds.forEach(id => {
-                let card = window.allAvailableCards.find(c => c.id === id);
-                if (!card) return;
-                for (let r = 0; r < 5; r++) {
-                    for (let col = 0; col < 5; col++) {
-                        if (card.numbers[r][col] === num) {
-                            if (window.cardMarks[card.id]) window.cardMarks[card.id][`${r}-${col}`] = false;
-                        }
-                    }
-                }
-            });
-        }
-
         window.getWonModalitiesForCard = function(cardId) {
             let marks = window.cardMarks[cardId] || {};
             let wonModesNames = [];
@@ -1580,116 +1685,6 @@
             }
             return winningCells;
         }
-if (!window.ocultosYaAlertados) window.ocultosYaAlertados = new Set();
-
-        window.mostrarBannerAuditoriaOculta = function(ganadores) {
-            let banner = document.getElementById('banner-auditoria-oculta');
-            if (!banner) {
-                banner = document.createElement('div');
-                banner.id = 'banner-auditoria-oculta';
-                banner.style.cssText = 'position:fixed; bottom:16px; left:50%; transform:translateX(-50%); z-index:9999; width:92%; max-width:420px; background:#0f172a; border:2px solid #f59e0b; border-radius:14px; padding:12px 14px; box-shadow:0 10px 25px rgba(0,0,0,0.8); color:#fff; font-family:sans-serif;';
-                document.body.appendChild(banner);
-            }
-
-            let itemsHtml = ganadores.map(g => 
-                `<div style="font-size:11px; margin-top:4px; color:#fde68a;">• <b>Cartón ${g.carton}</b> (${g.lote}) — Hizo: <span style="color:#34d399; font-weight:bold;">${g.modalidad}</span></div>`
-            ).join('');
-
-            banner.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:6px;">
-                    <span style="font-size:11px; font-weight:900; color:#fbbf24; text-transform:uppercase;">🕵️ Auditoría: Cartón Oculto Ganador</span>
-                    <button onclick="document.getElementById('banner-auditoria-oculta').style.display='none'" style="background:#ef4444; color:#fff; border:none; border-radius:6px; padding:2px 8px; font-size:11px; font-weight:bold; cursor:pointer;">Cerrar</button>
-                </div>
-                <div style="max-height:140px; overflow-y:auto; margin-top:4px;">${itemsHtml}</div>
-            `;
-            banner.style.display = 'block';
-        };
-
-        window.auditarColoresEnJuego = function() {
-            let coloresEnJuego = new Set();
-            window.selectedCardsIds.forEach(id => {
-                let card = window.allAvailableCards.find(c => c.id === id);
-                if (card && card.color) {
-                    coloresEnJuego.add(card.color.toLowerCase().trim());
-                }
-            });
-
-            if (coloresEnJuego.size === 0) return;
-
-            let resultadosGanadores = [];
-            let resultadosAPique = [];
-
-            window.allAvailableCards.forEach(card => {
-                let cardColor = (card.color || '').toLowerCase().trim();
-                
-                if (coloresEnJuego.has(cardColor) && !window.selectedCardsIds.includes(card.id)) {
-                    let marcasVirtuales = { "2-2": true };
-                    for (let r = 0; r < 5; r++) {
-                        for (let c = 0; c < 5; c++) {
-                            let val = card.numbers[r][c];
-                            if (typeof val === 'number' && window.masterMarkedNumbers.has(val)) {
-                                marcasVirtuales[`${r}-${c}`] = true;
-                            }
-                        }
-                    }
-
-                    for (let mKey in window.gameModes) {
-                        let mode = window.gameModes[mKey];
-                        if (!mode.active) continue;
-
-                        let faltantes = window.getMissingCellsForMode(card, marcasVirtuales, mKey);
-                        if (faltantes.length === 1) {
-                            let pos = faltantes[0];
-                            resultadosAPique.push({
-                                carton: card.title,
-                                lote: card.batch,
-                                modalidad: mode.name,
-                                faltaNumero: card.numbers[pos.r][pos.c]
-                            });
-                        }
-
-                        let gano = false;
-                        if (mKey === 'blackout') {
-                            gano = [0,1,2,3,4].every(r => [0,1,2,3,4].every(c => marcasVirtuales[`${r}-${c}`]));
-                        } else if (mKey === 'diagonal') {
-                            gano = [0,1,2,3,4].every(i => marcasVirtuales[`${i}-${i}`]) || 
-                                   [0,1,2,3,4].every(i => marcasVirtuales[`${i}-${4-i}`]);
-                        } else if (mKey === 'horizontal') {
-                            gano = [0,1,2,3,4].some(r => [0,1,2,3,4].every(c => marcasVirtuales[`${r}-${c}`]));
-                        } else if (mKey === 'vertical') {
-                            gano = [0,1,2,3,4].some(c => [0,1,2,3,4].every(r => marcasVirtuales[`${r}-${c}`]));
-                        } else if (mKey === 'corners') {
-                            gano = marcasVirtuales['0-0'] && marcasVirtuales['0-4'] && marcasVirtuales['4-0'] && marcasVirtuales['4-4'];
-                        } else {
-                            gano = [0,1,2,3,4].every(r => [0,1,2,3,4].every(c => !mode.isCellInPattern(r, c) || marcasVirtuales[`${r}-${c}`]));
-                        }
-
-                        if (gano) {
-                            let claveUnica = `${Number(card.id)}_${mKey}`;
-                            if (!window.ocultosYaAlertados.has(claveUnica)) {
-                                window.ocultosYaAlertados.add(claveUnica);
-                                resultadosGanadores.push({
-                                    carton: card.title,
-                                    lote: card.batch,
-                                    modalidad: mode.name
-                                });
-                            }
-                        }
-                    }
-                }
-            });
-
-            if (resultadosAPique.length > 0) {
-                console.log(`[AUDITORÍA EN JUEGO - A PIQUE]:`, resultadosAPique);
-            }
-
-            if (resultadosGanadores.length > 0) {
-                let mensaje = resultadosGanadores.map(g => `• Cartón ${g.carton} (${g.lote}) — Hizo: ${g.modalidad}`).join('\n');
-                console.warn(`¡GANADOR OCULTO DETECTADO!\n${mensaje}`);
-                window.mostrarBannerAuditoriaOculta(resultadosGanadores);
-                window.guardarEstadoEnLocalStorage();
-            }
-        };
 
         window.showWinModal = function(winningInfoList) {
             const modal = document.getElementById('win-modal');
@@ -1751,8 +1746,7 @@ if (!window.ocultosYaAlertados) window.ocultosYaAlertados = new Set();
         window.closeProjectorMode = function() {
             document.getElementById('projector-modal').classList.add('hidden');
         }
-
-        window.renderProjectorBoard = function() {
+window.renderProjectorBoard = function() {
             const grid = document.getElementById('projector-board-grid');
             const badge = document.getElementById('projector-count-badge');
             const recentProj = document.getElementById('projector-recent-balls');
@@ -1842,16 +1836,18 @@ if (!window.ocultosYaAlertados) window.ocultosYaAlertados = new Set();
                     btn.type = 'button';
                     
                     let isDrawn = window.masterMarkedNumbers.has(num);
-                    let isMissing = missingNumbersSet.has(num) && !isDrawn;
-
-                 let activeColor = window.getActiveThemeColor();
+                    let isMissingForWin = missingNumbersSet.has(num) && !isDrawn;
+                    let activeColor = window.getActiveThemeColor();
+                    
                     let cssClass = 'bg-slate-100 text-slate-950 border-slate-300 hover:bg-white hover:text-black';
                     if (isDrawn) {
                         cssClass = `master-cell-marked-${activeColor} text-white`;
+                    } else if (isMissingForWin) {
+                        cssClass = 'master-cell-missing';
                     }
 
                     btn.className = `h-7 sm:h-8 flex items-center justify-center text-xs sm:text-sm font-black rounded-md border transition-all ${cssClass}`;
-                    btn.textContent = num;
+                    btn.textContent = num; // <--- ESTA LÍNEA FALTABA Y ERA LA QUE CAUSABA QUE NO SE VIERAN LOS NÚMEROS
                     
                     btn.onclick = () => {
                         window.toggleMasterNumber(num);
@@ -1862,10 +1858,6 @@ if (!window.ocultosYaAlertados) window.ocultosYaAlertados = new Set();
                 }
                 grid.appendChild(colDiv);
             }
-        }
-
-        window.updateDrawnCountBadge = function() {
-            document.getElementById('drawn-count-badge').textContent = `${window.masterMarkedNumbers.size}`;
         }
 
         window.clearAllMarks = function() {
