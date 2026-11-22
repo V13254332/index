@@ -164,8 +164,9 @@
                 <i class="fa-solid fa-person-chalkboard"></i> <span>Proyector</span>
             </button>
 
-<button id="btn-voice-control" onclick="toggleVoiceControl()" class="bg-violet-600/30 hover:bg-violet-600/50 text-violet-300 border border-violet-500/40 px-2 py-1 rounded-lg text-[10px] font-semibold transition flex items-center gap-1 shadow-sm" title="Activar Control por Voz">
-    <i class="fa-solid fa-microphone-slash" id="voice-icon"></i> <span class="hidden xs:inline sm:inline" id="voice-text">Voz: OFF</span>
+<button id="btn-voice-control" onclick="toggleVoiceControl()" class="bg-violet-600/30 hover:bg-violet-600/50 text-violet-300 border border-violet-500/40 px-2 py-1 rounded-lg text-[10px] font-semibold transition flex items-center gap-1 shadow-sm shrink-0" title="Activar Control por Voz">
+    <i class="fa-solid fa-microphone-slash" id="voice-icon"></i>
+    <span id="voice-text">Voz: OFF</span>
 </button>
             <button onclick="downloadApp()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 p-1.5 rounded-lg text-[10px] font-semibold transition border border-slate-600" title="Descargar App">
                 <i class="fa-solid fa-download text-indigo-400"></i>
@@ -174,11 +175,33 @@
     </header>
 
     <!-- Main Content Layout -->
-    <main class="flex-1 max-w-[1600px] w-full mx-auto p-2 sm:p-4 flex flex-col lg:grid lg:grid-cols-12 gap-2.5 items-start" id="main-container-layout">
+   <main class="flex-1 max-w-[1600px] w-full mx-auto p-2 sm:p-4 flex flex-col md:grid md:grid-cols-12 gap-2.5 items-start" id="main-container-layout">
+    
+    <!-- Columna Izquierda: Dictado de Voz, Tablero Maestro y A Pique -->
+    <section class="w-full min-w-0 md:col-span-5 flex flex-col gap-2.5" id="master-board-section">
         
+        <!-- Panel de Dictado de Voz -->
+        <div id="voice-panel-card" class="bg-slate-800 border border-violet-500/40 rounded-xl p-2 shadow-xl flex flex-col gap-1.5 w-full min-w-0">
+            <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-1.5 min-w-0">
+                    <span id="voice-status-dot" class="w-2 h-2 rounded-full bg-slate-500 shrink-0"></span>
+                    <span class="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-violet-300 truncate">
+                        Dictado de Voz
+                    </span>
+                </div>
+                <button type="button" id="btn-voice-panel-toggle" onclick="toggleVoiceControl()" class="bg-violet-600 hover:bg-violet-500 text-white px-2.5 py-1 rounded-lg text-[10px] font-bold transition flex items-center gap-1 shrink-0">
+                    <i class="fa-solid fa-microphone" id="voice-panel-icon"></i>
+                    <span id="voice-panel-btn-text">Activar Voz</span>
+                </button>
+            </div>
+            <div class="bg-slate-900/90 border border-slate-700/80 rounded-lg px-2 py-1 flex items-center justify-between gap-2 text-[10px]">
+                <span class="text-slate-400 truncate" id="voice-transcript-display">Listo para dictar números (1–75)</span>
+                <span id="voice-last-number-badge" class="bg-indigo-600/30 text-indigo-200 border border-indigo-500/40 px-1.5 py-0.5 rounded font-black text-[9px] shrink-0">--</span>
+            </div>
+        </div>
+
         <!-- Left Column (Tablero Maestro) -->
-        <section class="w-full min-w-0 lg:col-span-5 flex flex-col gap-2.5" id="master-board-section">
-            <div id="master-board-card" class="bg-slate-800 rounded-xl p-2 sm:p-3 shadow-xl flex flex-col double-frame w-full min-w-0">
+<div id="master-board-card" class="bg-slate-800 rounded-xl p-2 sm:p-3 shadow-xl flex flex-col double-frame w-full min-w-0">
                 <div class="flex flex-wrap justify-between items-center mb-1.5 gap-1">
                     <h3 class="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1 truncate">
                         <i class="fa-solid fa-table-cells text-indigo-400"></i> <span>Tablero</span>
@@ -215,8 +238,8 @@
             </div>
         </section>
 
-        <!-- Right Column (Modalidades y Cartones Activos) -->
-        <section class="w-full min-w-0 lg:col-span-7 flex flex-col gap-2.5" id="right-panel-section">
+        <!-- Columna Derecha: Modalidades y Cartones Activos -->
+    <section class="w-full min-w-0 md:col-span-7 flex flex-col gap-2.5" id="right-panel-section">
             
             <!-- MODALIDADES CON MINIATURAS -->
             <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-lg overflow-hidden p-1.5 sm:p-2 flex flex-col gap-1.5 w-full min-w-0">
@@ -1898,93 +1921,125 @@ window.renderProjectorBoard = function() {
         window.recognitionInstance = null;
         window.isVoiceActive = false;
 
-        window.toggleVoiceControl = function() {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            
-            if (!SpeechRecognition) {
-                alert("Tu navegador no soporta reconocimiento de voz. Prueba usando Google Chrome.");
-                return;
+window.updateVoiceUI = function(active, statusText = "", lastNum = null) {
+    const btn = document.getElementById('btn-voice-control');
+    const icon = document.getElementById('voice-icon');
+    const txt = document.getElementById('voice-text');
+
+    const panelBtn = document.getElementById('btn-voice-panel-toggle');
+    const panelIcon = document.getElementById('voice-panel-icon');
+    const panelBtnText = document.getElementById('voice-panel-btn-text');
+    const dot = document.getElementById('voice-status-dot');
+    const display = document.getElementById('voice-transcript-display');
+    const badge = document.getElementById('voice-last-number-badge');
+
+    if (active) {
+        if (btn) {
+            btn.className = "bg-emerald-600 text-white border border-emerald-400 px-2 py-1 rounded-lg text-[10px] font-semibold transition flex items-center gap-1 shadow-sm animate-pulse shrink-0";
+        }
+        if (icon) icon.className = "fa-solid fa-microphone";
+        if (txt) txt.textContent = "Escuchando";
+
+        if (panelBtn) {
+            panelBtn.className = "bg-rose-600 hover:bg-rose-500 text-white px-2.5 py-1 rounded-lg text-[10px] font-bold transition flex items-center gap-1 shrink-0";
+        }
+        if (panelIcon) panelIcon.className = "fa-solid fa-microphone-slash";
+        if (panelBtnText) panelBtnText.textContent = "Detener";
+        if (dot) dot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0";
+    } else {
+        if (btn) {
+            btn.className = "bg-violet-600/30 hover:bg-violet-600/50 text-violet-300 border border-violet-500/40 px-2 py-1 rounded-lg text-[10px] font-semibold transition flex items-center gap-1 shadow-sm shrink-0";
+        }
+        if (icon) icon.className = "fa-solid fa-microphone-slash";
+        if (txt) txt.textContent = "Voz: OFF";
+
+        if (panelBtn) {
+            panelBtn.className = "bg-violet-600 hover:bg-violet-500 text-white px-2.5 py-1 rounded-lg text-[10px] font-bold transition flex items-center gap-1 shrink-0";
+        }
+        if (panelIcon) panelIcon.className = "fa-solid fa-microphone";
+        if (panelBtnText) panelBtnText.textContent = "Activar Voz";
+        if (dot) dot.className = "w-2 h-2 rounded-full bg-slate-500 shrink-0";
+    }
+
+    if (display && statusText) {
+        display.textContent = statusText;
+    }
+    if (badge && lastNum !== null) {
+        badge.textContent = `#${lastNum}`;
+    }
+};
+
+window.toggleVoiceControl = function() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+        window.updateVoiceUI(false, "Navegador sin soporte de voz (usa Chrome)");
+        alert("Tu navegador no soporta reconocimiento de voz. Prueba usando Google Chrome.");
+        return;
+    }
+
+    if (window.isVoiceActive) {
+        if (window.recognitionInstance) {
+            window.recognitionInstance.stop();
+        }
+        window.isVoiceActive = false;
+        window.updateVoiceUI(false, "Dictado pausado");
+    } else {
+        try {
+            window.recognitionInstance = new SpeechRecognition();
+            window.recognitionInstance.lang = 'es-ES';
+            window.recognitionInstance.continuous = true;
+            window.recognitionInstance.interimResults = false;
+
+            window.recognitionInstance.onstart = function() {
+                window.isVoiceActive = true;
+                window.updateVoiceUI(true, "Escuchando... di un número del 1 al 75");
+            };
+
+            window.recognitionInstance.onresult = function(event) {
+                const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
+                window.updateVoiceUI(true, `Escuchado: "${transcript}"`);
+                window.processVoiceCommand(transcript);
+            };
+
+            window.recognitionInstance.onerror = function(event) {
+                console.error("Error de voz:", event.error);
+                window.updateVoiceUI(false, `Error de micrófono: ${event.error}`);
+            };
+
+            window.recognitionInstance.onend = function() {
+                if (window.isVoiceActive) {
+                    try { window.recognitionInstance.start(); } catch (e) {}
+                }
+            };
+
+            window.recognitionInstance.start();
+        } catch (e) {
+            console.error("No se pudo iniciar la voz:", e);
+            window.updateVoiceUI(false, "No se pudo acceder al micrófono");
+            alert("No se pudo acceder al micrófono.");
+        }
+    }
+};
+
+window.processVoiceCommand = function(text) {
+    const cleanedText = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const matches = cleanedText.match(/\d+/g);
+
+    if (matches && matches.length > 0) {
+        let num = parseInt(matches[0], 10);
+        if (num >= 1 && num <= 75) {
+            window.toggleMasterNumber(num);
+            window.updateVoiceUI(true, `Marcado: "${text}"`, num);
+        }
+    } else {
+        if (cleanedText.includes("reiniciar") || cleanedText.includes("nuevo juego")) {
+            if (confirm("¿Reiniciar juego por comando de voz?")) {
+                window.resetGame();
             }
-
-            const btn = document.getElementById('btn-voice-control');
-            const icon = document.getElementById('voice-icon');
-            const txt = document.getElementById('voice-text');
-
-            if (window.isVoiceActive) {
-                // Apagar
-                if (window.recognitionInstance) {
-                    window.recognitionInstance.stop();
-                }
-                window.isVoiceActive = false;
-                btn.className = "bg-violet-600/30 hover:bg-violet-600/50 text-violet-300 border border-violet-500/40 px-2 py-1 rounded-lg text-[10px] font-semibold transition flex items-center gap-1 shadow-sm";
-                icon.className = "fa-solid fa-microphone-slash";
-                txt.textContent = "Voz: OFF";
-            } else {
-                // Encender
-                try {
-                    window.recognitionInstance = new SpeechRecognition();
-                    window.recognitionInstance.lang = 'es-ES'; // Idioma español
-                    window.recognitionInstance.continuous = true;
-                    window.recognitionInstance.interimResults = false;
-
-                    window.recognitionInstance.onstart = function() {
-                        window.isVoiceActive = true;
-                        btn.className = "bg-emerald-600 text-white border border-emerald-400 px-2 py-1 rounded-lg text-[10px] font-semibold transition flex items-center gap-1 shadow-sm animate-pulse";
-                        icon.className = "fa-solid fa-microphone";
-                        txt.textContent = "Escuchando...";
-                    };
-
-                    window.recognitionInstance.onresult = function(event) {
-                        const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
-                        console.log("Voz captada:", transcript);
-                        window.processVoiceCommand(transcript);
-                    };
-
-                    window.recognitionInstance.onerror = function(event) {
-                        console.error("Error de voz:", event.error);
-                    };
-
-                    window.recognitionInstance.onend = function() {
-                        // Si seguía activo y se cortó por silencio, lo reiniciamos automáticamente
-                        if (window.isVoiceActive) {
-                            try { window.recognitionInstance.start(); } catch(e){}
-                        }
-                    };
-
-                    window.recognitionInstance.start();
-                } catch(e) {
-                    console.error("No se pudo iniciar la voz:", e);
-                    alert("No se pudo acceder al micrófono.");
-                }
-            }
-        };
-
-        window.processVoiceCommand = function(text) {
-            // Limpiamos el texto para extraer números (ej: "B 12", "número 15", "bicolor 30", o solo "12")
-            // Buscamos cualquier número del 1 al 75 mencionado
-            const cleanedText = text.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // Quitar acentos
-            
-            // Expresión regular para buscar números aislados
-            const matches = cleanedText.match(/\d+/g);
-            
-            if (matches && matches.length > 0) {
-                let num = parseInt(matches[0], 10);
-                if (num >= 1 && num <= 75) {
-                    // ¡Número válido de bingo! Ejecutamos el toggle tal cual si hicieras clic
-                    window.toggleMasterNumber(num);
-                    
-                    // Efecto visual rápido o feedback de audio opcional
-                    console.log(`¡Voz marcó el número: ${num}!`);
-                }
-            } else {
-                // Comandos especiales por voz opcionales
-                if (cleanedText.includes("reiniciar") || cleanedText.includes("nuevo juego")) {
-                    if (confirm("¿Reiniciar juego por comando de voz?")) {
-                        window.resetGame();
-                    }
-                }
-            }
-        };
+        }
+    }
+};
     </script>
 </body>
 </html>
