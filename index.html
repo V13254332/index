@@ -1524,13 +1524,95 @@ async function cargarCartonesDesdeFirebase() {
             }
         }
 
-        window.removeAllActiveCards = function() {
+ window.openConfirmModal = function({ title, message, acceptText = "Confirmar", onAccept }) {
+    const modal = document.getElementById('confirm-action-modal');
+    const titleEl = document.getElementById('confirm-modal-title');
+    const msgEl = document.getElementById('confirm-modal-message');
+    const cancelBtn = document.getElementById('confirm-modal-cancel');
+    const acceptBtn = document.getElementById('confirm-modal-accept');
+
+    if (!modal || !titleEl || !msgEl || !cancelBtn || !acceptBtn) return;
+
+    titleEl.textContent = title || "¿Confirmar acción?";
+    msgEl.textContent = message || "";
+    acceptBtn.textContent = acceptText;
+
+    const closeModal = () => modal.classList.add('hidden');
+
+    cancelBtn.onclick = closeModal;
+    modal.onclick = (e) => {
+        if (e.target === modal) closeModal();
+    };
+
+    acceptBtn.onclick = () => {
+        closeModal();
+        if (typeof onAccept === 'function') onAccept();
+    };
+
+    modal.classList.remove('hidden');
+};
+
+window.removeAllActiveCards = function() {
+    if (!window.selectedCardsIds || window.selectedCardsIds.length === 0) {
+        alert("No hay cartones en juego para quitar.");
+        return;
+    }
+
+    const totalCartones = window.selectedCardsIds.length;
+    window.openConfirmModal({
+        title: "Quitar cartones",
+        message: `¿Realmente deseas quitar los ${totalCartones} cartón(es) en juego? Se borrarán sus marcas y nombres asignados.`,
+        acceptText: "Sí, quitar",
+        onAccept: () => {
             window.selectedCardsIds = [];
             window.cardMarks = {};
             window.playerNames = {};
             window.guardarEstadoEnLocalStorage();
             window.initActiveCards();
         }
+    });
+};
+
+window.executeResetGame = function() {
+    window.masterMarkedNumbers.clear();
+    window.drawnHistoryArray = [];
+    window.cardMarks = {};
+    window.alreadyDeclaredWins.clear();
+    window.ocultosYaAlertados.clear();
+    window.selectedCardsIds.forEach(id => window.cardMarks[id] = { "2-2": true });
+    window.renderMasterBoard();
+    window.renderPlayerCards();
+    window.closeWinModal();
+    window.guardarEstadoEnLocalStorage();
+};
+
+window.resetGame = function() {
+    window.openConfirmModal({
+        title: "Reiniciar tablero",
+        message: "¿Realmente deseas reiniciar el tablero? Se borrarán todas las bolas cantadas, el historial y las marcas actuales.",
+        acceptText: "Sí, reiniciar",
+        onAccept: () => {
+            window.executeResetGame();
+        }
+    });
+};
+
+window.processVoiceCommand = function(text) {
+    const cleanedText = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const matches = cleanedText.match(/\d+/g);
+
+    if (matches && matches.length > 0) {
+        let num = parseInt(matches[0], 10);
+        if (num >= 1 && num <= 75) {
+            window.toggleMasterNumber(num);
+            window.updateVoiceUI(true, `Marcado: "${text}"`, num);
+        }
+    } else {
+        if (cleanedText.includes("reiniciar") || cleanedText.includes("nuevo juego")) {
+            window.resetGame();
+        }
+    }
+};
 
         window.updatePlayerName = function(cardId, nameVal) {
             window.playerNames[cardId] = nameVal;
@@ -1894,19 +1976,6 @@ window.renderProjectorBoard = function() {
             window.guardarEstadoEnLocalStorage();
         }
 
-        window.resetGame = function() {
-            window.masterMarkedNumbers.clear();
-            window.drawnHistoryArray = [];
-            window.cardMarks = {};
-            window.alreadyDeclaredWins.clear();
-            window.ocultosYaAlertados.clear();
-            window.selectedCardsIds.forEach(id => window.cardMarks[id] = { "2-2": true });
-            window.renderMasterBoard();
-            window.renderPlayerCards();
-            window.closeWinModal();
-            window.guardarEstadoEnLocalStorage();
-        }
-
         window.downloadApp = function() {
             const blob = new Blob([document.documentElement.outerHTML], { type: 'text/html;charset=utf-8' });
             const url = URL.createObjectURL(blob);
@@ -2041,5 +2110,23 @@ window.processVoiceCommand = function(text) {
     }
 };
     </script>
+<!-- MODAL DE CONFIRMACIÓN PERSONALIZADO -->
+<div id="confirm-action-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-[70] hidden flex items-center justify-center p-3">
+    <div class="bg-slate-900 border border-amber-500/40 rounded-2xl p-4 sm:p-5 max-w-sm w-full shadow-2xl flex flex-col text-center">
+        <div class="inline-flex mx-auto bg-rose-500/20 p-3 rounded-full text-rose-400 mb-2.5 border border-rose-500/40">
+            <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+        </div>
+        <h3 id="confirm-modal-title" class="text-sm sm:text-base font-black text-white uppercase tracking-wide">¿Confirmar acción?</h3>
+        <p id="confirm-modal-message" class="text-xs text-slate-300 mt-1.5 leading-relaxed"></p>
+        <div class="mt-5 flex items-center justify-center gap-2">
+            <button type="button" id="confirm-modal-cancel" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-2 px-3 rounded-xl text-xs transition">
+                Cancelar
+            </button>
+            <button type="button" id="confirm-modal-accept" class="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-semibold py-2 px-3 rounded-xl text-xs shadow-lg transition">
+                Confirmar
+            </button>
+        </div>
+    </div>
+</div>
 </body>
 </html>
